@@ -160,9 +160,7 @@ export default function Practice() {
             <div className="stats-badge" style={{ top: '1rem', left: '1rem', background: '#333', color: '#fff' }}>
                 {currentProblemIndex} / {limit}
             </div>
-            <div style={{ position: 'absolute', top: '3rem', right: '1rem', fontSize: '0.8rem', color: '#666' }}>
-                O: {stats.correct} X: {stats.wrong}
-            </div>
+
 
             <div style={{ marginTop: '3rem', marginBottom: '1rem', minHeight: '30px' }}>
                 {combo > 1 && (
