@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { StorageService } from '../lib/storage';
-import { BookOpen, Target, Brain, LogOut, CheckSquare, Sparkles, LayoutGrid } from 'lucide-react';
+import { BookOpen, Target, Brain, CheckSquare, Sparkles, LayoutGrid } from 'lucide-react';
 import GugudanTable from '../components/GugudanTable';
 
 export default function Dashboard() {
-    const { user, logout } = useUser();
+    const { user } = useUser();
     const navigate = useNavigate();
     const [showTable, setShowTable] = useState(false);
     const [basicDans, setBasicDans] = useState([2, 3, 4, 5, 6, 7, 8, 9]);
@@ -66,11 +66,9 @@ export default function Dashboard() {
 
     return (
         <div className="card animate-pop" style={{ maxWidth: '600px', width: '100%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h2>안녕, {user.name}! 👋</h2>
-                <button onClick={logout} className="btn-outline" style={{ padding: '0.5rem', width: 'auto' }}>
-                    <LogOut size={20} />
-                </button>
+            {/* Header: Centered Greeting, No Logout Button */}
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                <h2 style={{ margin: 0 }}>안녕, {user.name}! 👋</h2>
             </div>
 
             {/* --- New Practice Mode Buttons --- */}
@@ -100,7 +98,7 @@ export default function Dashboard() {
                 </button>
             </div>
 
-            {/* Table Button Moved Here */}
+            {/* Table Button */}
             <button className="btn btn-outline" onClick={() => setShowTable(true)} style={{ width: '100%', padding: '0.8rem', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <BookOpen size={18} style={{ marginRight: '8px' }} /> 구구단 표 참고하기
             </button>
