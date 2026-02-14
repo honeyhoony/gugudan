@@ -266,7 +266,6 @@ p {
   max-width: 90%;
   max-height: 80vh;
   overflow-y: auto;
-  position: relative;
 }
 
 .close-btn {
