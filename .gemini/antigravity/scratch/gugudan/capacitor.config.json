@@ -1,0 +1,6 @@
+{
+    "appId": "com.honeyhoony.gugudan",
+    "appName": "구구단 마스터",
+    "webDir": "dist",
+    "bundledWebRuntime": false
+}
