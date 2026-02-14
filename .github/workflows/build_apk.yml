@@ -21,24 +21,20 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22' # <--- 여기를 22로 올렸습니다!
           cache: 'npm'
           cache-dependency-path: '.gemini/antigravity/scratch/gugudan/package-lock.json'
 
       - name: Install dependencies
-        # 깊은 폴더로 들어가서 설치합니다.
         run: cd .gemini/antigravity/scratch/gugudan && npm ci
 
       - name: Build Web App
-        # 깊은 폴더로 들어가서 빌드합니다.
         run: cd .gemini/antigravity/scratch/gugudan && npm run build
 
       - name: Capacitor Sync
-        # 깊은 폴더로 들어가서 동기화합니다.
         run: cd .gemini/antigravity/scratch/gugudan && npx cap sync
 
       - name: Build with Gradle
-        # 안드로이드 폴더로 들어가서 APK를 뽑아냅니다.
         run: |
           cd .gemini/antigravity/scratch/gugudan/android
           chmod +x gradlew
