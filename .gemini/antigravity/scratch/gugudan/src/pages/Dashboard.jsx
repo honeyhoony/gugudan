@@ -75,7 +75,7 @@ export default function Dashboard() {
 
             {/* --- New Practice Mode Buttons --- */}
             <h3 style={{ textAlign: 'left', marginBottom: '0.5rem' }}>학습 모드 선택</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', marginBottom: '0.5rem' }}>
 
                 {/* Magic Practice */}
                 <button
@@ -99,6 +99,11 @@ export default function Dashboard() {
                     <span style={{ fontSize: '0.8rem', opacity: 0.8, fontWeight: 'normal' }}>인도 베다 수학 (12~19단)</span>
                 </button>
             </div>
+
+            {/* Table Button Moved Here */}
+            <button className="btn btn-outline" onClick={() => setShowTable(true)} style={{ width: '100%', padding: '0.8rem', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <BookOpen size={18} style={{ marginRight: '8px' }} /> 구구단 표 참고하기
+            </button>
 
             <hr style={{ opacity: 0.2, margin: '1.5rem 0' }} />
 
@@ -174,10 +179,6 @@ export default function Dashboard() {
                     </button>
                 </div>
             )}
-
-            <button className="btn btn-outline" onClick={() => setShowTable(true)} style={{ marginTop: '2rem', width: 'auto', padding: '0.5rem 1rem' }}>
-                <BookOpen size={16} style={{ marginRight: '5px' }} /> 표 참고하기
-            </button>
 
             {showTable && <GugudanTable onClose={() => setShowTable(false)} />}
         </div>
