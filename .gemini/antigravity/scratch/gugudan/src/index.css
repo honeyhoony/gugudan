@@ -1,0 +1,345 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+
+:root {
+  --primary: #FF6B6B;
+  --secondary: #4ECDC4;
+  --accent: #FFE66D;
+  --dark: #292E49;
+  --light: #F7FFF7;
+  --success: #2ecc71;
+  --error: #e74c3c;
+  --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --glass: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --card-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+}
+
+body {
+  font-family: 'Noto Sans KR', sans-serif;
+  background: var(--bg-gradient);
+  color: var(--light);
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow-x: hidden;
+  line-height: 1.5;
+}
+
+#root {
+  width: 100%;
+  max-width: 480px;
+  /* Mobile-first container */
+  margin: 0 auto;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+/* Animations */
+@keyframes popIn {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes shake {
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-5px);
+  }
+
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.animate-pop {
+  animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.animate-shake {
+  animation: shake 0.4s ease-in-out;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Components */
+.card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  padding: 2rem;
+  box-shadow: var(--card-shadow);
+  text-align: center;
+  color: var(--dark);
+}
+
+.btn {
+  font-family: 'Noto Sans KR', sans-serif;
+  display: inline-block;
+  padding: 1rem 2rem;
+  border-radius: 16px;
+  border: none;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  margin: 0.5rem 0;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  text-decoration: none;
+  color: var(--dark);
+}
+
+.btn:active {
+  transform: scale(0.95);
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+}
+
+.btn-secondary {
+  background: var(--secondary);
+  color: var(--dark);
+  box-shadow: 0 4px 15px rgba(78, 205, 196, 0.4);
+}
+
+.btn-accent {
+  background: var(--accent);
+  color: var(--dark);
+}
+
+.btn-outline {
+  background: transparent;
+  border: 2px solid var(--dark);
+  color: var(--dark);
+  font-weight: 700;
+}
+
+h1 {
+  font-size: 2.2rem;
+  margin-bottom: 1rem;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  font-weight: 900;
+}
+
+h2 {
+  font-size: 1.6rem;
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+}
+
+p {
+  font-size: 1.1rem;
+  opacity: 0.95;
+  font-weight: 500;
+}
+
+.input-field {
+  width: 100%;
+  padding: 1rem;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 1.2rem;
+  font-family: 'Noto Sans KR', sans-serif;
+  text-align: center;
+  outline: none;
+  margin-bottom: 1rem;
+  box-sizing: border-box;
+  font-weight: 700;
+}
+
+.input-field::placeholder {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.input-field:focus {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Grid for choices */
+.choice-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.choice-btn {
+  background: white;
+  color: var(--dark);
+  font-size: 2rem;
+  padding: 1.2rem;
+  border-radius: 16px;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.1s;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.1);
+  font-family: 'Noto Sans KR', sans-serif;
+  font-weight: 900;
+  /* Extra bold for numbers */
+}
+
+.choice-btn:active {
+  transform: translateY(4px);
+  box-shadow: none;
+}
+
+.choice-btn.correct {
+  background: var(--success);
+  color: white;
+  animation: popIn 0.3s;
+}
+
+.choice-btn.wrong {
+  background: var(--error);
+  color: white;
+  animation: shake 0.4s;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(5px);
+}
+
+.modal-content {
+  background: white;
+  color: var(--dark);
+  padding: 2rem;
+  border-radius: 20px;
+  max-width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.close-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: #eee;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Specific elements */
+.gugudan-table {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 1rem;
+  text-align: left;
+}
+
+.dan-column {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid #eee;
+}
+
+.dan-title {
+  color: var(--primary);
+  font-size: 1.3rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 3px solid var(--accent);
+  padding-bottom: 0.2rem;
+  font-weight: 900;
+}
+
+.problem-display {
+  font-size: 4.5rem;
+  font-weight: 900;
+  margin: 2rem 0;
+  text-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  letter-spacing: 2px;
+}
+
+.stats-badge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.tip-box {
+  background: #fffbeb;
+  border: 3px solid #fcd34d;
+  padding: 1.2rem;
+  border-radius: 16px;
+  margin-top: 1rem;
+  color: #78350f;
+  text-align: left;
+  animation: popIn 0.5s;
+}
+
+.tip-box h4 {
+  font-size: 1.2rem;
+  font-weight: 900;
+  margin-top: 0;
+}
+
+.calc-steps {
+  font-size: 1rem;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 0.8rem;
+  border-radius: 12px;
+  margin-top: 0.8rem;
+  line-height: 1.8;
+  font-weight: 500;
+}
