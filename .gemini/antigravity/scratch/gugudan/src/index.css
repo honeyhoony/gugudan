@@ -348,3 +348,35 @@ p {
   line-height: 1.8;
   font-weight: 500;
 }
+
+/* Mobile Responsive Tweaks */
+@media (max-width: 480px) {
+  h1 {
+    font-size: 1.8rem;
+  }
+
+  h2 {
+    font-size: 1.4rem;
+  }
+
+  .card {
+    padding: 1.5rem;
+  }
+
+  .problem-display {
+    font-size: 3.5rem;
+  }
+
+  .choice-btn {
+    font-size: 1.5rem;
+    padding: 1rem;
+  }
+
+  .choice-grid {
+    gap: 0.5rem;
+  }
+
+  .input-field {
+    font-size: 1rem;
+  }
+}
