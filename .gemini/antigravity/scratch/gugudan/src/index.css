@@ -35,10 +35,15 @@ body {
 #root {
   width: 100%;
   max-width: 480px;
-  /* Mobile-first container */
   margin: 0 auto;
   padding: 1rem;
   box-sizing: border-box;
+  /* Ensure padding doesn't add to width */
+}
+
+* {
+  box-sizing: border-box;
+  /* Global safety for sizing */
 }
 
 /* Animations */
@@ -351,32 +356,51 @@ p {
 
 /* Mobile Responsive Tweaks */
 @media (max-width: 480px) {
+  #root {
+    padding: 0.5rem;
+  }
+
+  /* Reduce outer padding */
+
   h1 {
-    font-size: 1.8rem;
+    font-size: 1.6rem;
+    margin-bottom: 0.5rem;
   }
 
   h2 {
-    font-size: 1.4rem;
+    font-size: 1.3rem;
   }
 
   .card {
-    padding: 1.5rem;
+    padding: 1.2rem;
+    /* Reduce card padding */
+    width: 100%;
+    /* Fill container */
+    max-width: 100%;
   }
 
   .problem-display {
-    font-size: 3.5rem;
+    font-size: 3rem;
+    margin: 1.5rem 0;
   }
 
   .choice-btn {
-    font-size: 1.5rem;
-    padding: 1rem;
+    font-size: 1.3rem;
+    padding: 0.8rem;
   }
 
   .choice-grid {
     gap: 0.5rem;
+    margin-top: 1rem;
   }
 
   .input-field {
+    font-size: 1rem;
+  }
+
+  /* Make buttons slightly smaller on very small screens */
+  .btn {
+    padding: 0.8rem 1rem;
     font-size: 1rem;
   }
 }

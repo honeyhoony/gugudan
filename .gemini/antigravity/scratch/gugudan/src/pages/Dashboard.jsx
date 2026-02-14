@@ -156,7 +156,7 @@ export default function Dashboard() {
                             onClick={() => setProblemCount(p)}
                             style={{ flex: 1, padding: '0.5rem', minWidth: '50px' }}
                         >
-                            {p}문제
+                            {p}개
                         </button>
                     ))}
                 </div>
