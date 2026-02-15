@@ -7,6 +7,24 @@ import { X, Mic, MicOff, Timer } from 'lucide-react';
 import ResultModal from '../components/ResultModal';
 import NumericKeypad from '../components/NumericKeypad';
 
+const KOREAN_NUMBERS = {
+    '영': 0, '공': 0, '일': 1, '하나': 1, '이': 2, '둘': 2, '삼': 3, '셋': 3,
+    '사': 4, '넷': 4, '오': 5, '다섯': 5, '육': 6, '여섯': 6, '칠': 7, '일곱': 7,
+    '팔': 8, '여덟': 8, '구': 9, '아홉': 9, '십': 10
+};
+
+const parseKoreanNumber = (text) => {
+    // Basic implementation for single digits or common results
+    let num = text.replace(/[^0-9]/g, '');
+    if (num) return parseInt(num);
+
+    // Check for words
+    for (let word in KOREAN_NUMBERS) {
+        if (text.includes(word)) return KOREAN_NUMBERS[word];
+    }
+    return null;
+};
+
 export default function Practice() {
     const { state } = useLocation();
     const { user, updateStats, settings } = useUser();
@@ -65,15 +83,22 @@ export default function Practice() {
             recognitionRef.current.interimResults = false;
 
             recognitionRef.current.onresult = (event) => {
-                const transcript = event.results[event.results.length - 1][0].transcript;
-                const number = transcript.replace(/[^0-9]/g, '');
-                if (number) {
+                const transcript = event.results[event.results.length - 1][0].transcript.trim();
+                console.log("Speech Transcript:", transcript);
+                const number = parseKoreanNumber(transcript);
+                if (number !== null) {
                     handleVoiceInput(number);
                 }
             };
 
+            recognitionRef.current.onerror = (event) => {
+                console.error("Speech Recognition Error:", event.error);
+                if (event.error === 'no-speech') return;
+                setIsListening(false);
+            };
+
             recognitionRef.current.onend = () => {
-                if (isListening) recognitionRef.current.start();
+                setIsListening(false);
             };
         }
 
@@ -185,8 +210,10 @@ export default function Practice() {
     };
 
     const handleQuit = () => {
-        if (confirm("정말 그만둘까요?")) {
-            navigate('/dashboard');
+        if (window.confirm("정말 그만둘까요?")) {
+            if (timerRef.current) clearInterval(timerRef.current);
+            if (recognitionRef.current) recognitionRef.current.stop();
+            navigate('/dashboard', { replace: true });
         }
     };
 
@@ -195,7 +222,7 @@ export default function Practice() {
             stats={stats}
             maxCombo={maxCombo}
             wrongProblems={wrongProblemsRef.current}
-            onHome={() => navigate('/dashboard')}
+            onHome={() => navigate('/dashboard', { replace: true })}
             onRetry={() => window.location.reload()}
         />;
     }
@@ -205,23 +232,24 @@ export default function Practice() {
     const currentProblem = problems[currentIndex];
 
     return (
-        <div className="card animate-pop" style={{ maxWidth: '500px', width: '95%', margin: '0 auto', position: 'relative' }}>
-            <button onClick={handleQuit} className="btn-outline" style={{ position: 'absolute', right: '1rem', top: '1rem', padding: '0.5rem', border: 'none', background: 'transparent', color: '#666' }}>
+        <div className="card animate-pop" style={{ maxWidth: '500px', width: '95%', margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
+            <button onClick={handleQuit} className="btn-outline" style={{ position: 'absolute', right: '0.8rem', top: '0.8rem', padding: '0.4rem', border: 'none', background: 'transparent', color: '#666', zIndex: 10 }}>
                 <X size={24} />
             </button>
 
-            <div className="stats-badge" style={{ top: '1rem', left: '1rem', background: '#333', color: '#fff' }}>
+            <div className="stats-badge" style={{ top: '1rem', left: '1rem', background: '#333', color: '#fff', fontSize: '0.9rem', padding: '0.3rem 0.8rem' }}>
                 {currentIndex + 1} / {problems.length}
             </div>
 
             {/* Timer Progress Bar */}
             <div style={{
                 width: '100%',
-                height: '8px',
+                height: '10px',
                 background: 'rgba(255,255,255,0.1)',
-                borderRadius: '4px',
-                marginTop: '3rem',
-                overflow: 'hidden'
+                borderRadius: '5px',
+                marginTop: '3.5rem',
+                overflow: 'hidden',
+                border: '1px solid rgba(0,0,0,0.05)'
             }}>
                 <div style={{
                     width: `${(timeLeft / 10) * 100}%`,
@@ -230,37 +258,47 @@ export default function Practice() {
                     transition: 'width 0.1s linear'
                 }} />
             </div>
-            <div style={{ textAlign: 'center', marginTop: '5px', fontSize: '0.9rem', color: timeLeft < 3 ? 'var(--error)' : 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
-                <Timer size={14} /> {timeLeft.toFixed(1)}s
+            <div style={{ textAlign: 'center', marginTop: '8px', fontSize: '1rem', fontWeight: 'bold', color: timeLeft < 3 ? 'var(--error)' : 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                <Timer size={16} /> {Math.ceil(timeLeft)}초 남음
             </div>
 
-            <div style={{ marginTop: '1rem', marginBottom: '1rem', minHeight: '30px', textAlign: 'center' }}>
+            <div style={{ marginTop: '1rem', marginBottom: '0.5rem', minHeight: '35px', textAlign: 'center' }}>
                 {combo > 1 && (
-                    <div className="animate-pop" style={{ color: '#ff6b6b', fontWeight: 'bold', fontSize: '1.5rem' }}>
+                    <div className="animate-pop" style={{ color: '#ff4757', fontWeight: '900', fontSize: '1.6rem', textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
                         🔥 {combo} 연속 정답! 🔥
                     </div>
                 )}
             </div>
 
-            <div className={`problem-display ${feedback === 'correct' ? 'animate-pop' : ''}`} style={{ fontSize: '4rem', textAlign: 'center', marginBottom: '1rem' }}>
-                {currentProblem.a} × {currentProblem.b} = {inputValue || '?'}
+            <div className={`problem-display ${feedback === 'correct' ? 'animate-pop' : ''}`} style={{
+                fontSize: 'clamp(3rem, 15vw, 4.5rem)',
+                textAlign: 'center',
+                marginBottom: '1rem',
+                fontWeight: 'bold',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+            }}>
+                {currentProblem.a} × {currentProblem.b} = <span style={{ color: feedback === 'wrong' ? 'var(--error)' : 'inherit' }}>{inputValue || '?'}</span>
             </div>
 
-            {feedback === 'wrong' && (
-                <div className="animate-pop" style={{ textAlign: 'center', marginBottom: '1rem' }}>
-                    <div style={{ color: 'var(--error)', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                        땡! 정답은 {currentProblem.a * currentProblem.b}
+            <div style={{ minHeight: '60px', marginBottom: '1rem' }}>
+                {feedback === 'wrong' && (
+                    <div className="animate-pop" style={{ textAlign: 'center' }}>
+                        <div style={{ color: 'var(--error)', fontSize: '1.5rem', fontWeight: 'bold', background: 'rgba(255,71,87,0.1)', padding: '0.5rem', borderRadius: '8px' }}>
+                            땡! 정답은 {currentProblem.a * currentProblem.b}
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {feedback === 'correct' && (
-                <div className="animate-pop" style={{ textAlign: 'center', marginBottom: '1rem' }}>
-                    <div style={{ color: 'var(--primary)', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                        정답! 잘했어요!
+                {feedback === 'correct' && (
+                    <div className="animate-pop" style={{ textAlign: 'center' }}>
+                        <div style={{ color: 'var(--primary)', fontSize: '1.5rem', fontWeight: 'bold', background: 'rgba(59,130,246,0.1)', padding: '0.5rem', borderRadius: '8px' }}>
+                            정답! 대단해요! 👏
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
 
             {!feedback && (
                 <NumericKeypad
@@ -272,13 +310,21 @@ export default function Practice() {
             )}
 
             {voiceEnabled && (
-                <div style={{ marginTop: '1.5rem', textAlign: 'center', opacity: 0.7 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                        {isListening ? <Mic color="var(--primary)" size={18} /> : <MicOff size={18} />}
-                        <span>음성으로 답해보세요 (예: "{currentProblem.a * currentProblem.b}")</span>
+                <div style={{ marginTop: '1.5rem', textAlign: 'center', background: isListening ? 'rgba(59,130,246,0.05)' : 'transparent', padding: '0.8rem', borderRadius: '12px', transition: 'all 0.3s' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: isListening ? 'var(--primary)' : '#666' }}>
+                        {isListening ? <Mic className="animate-pulse" size={20} /> : <MicOff size={20} />}
+                        <span style={{ fontWeight: isListening ? 'bold' : 'normal' }}>
+                            {isListening ? '듣고 있어요... 숫자를 말씀하세요' : '음성 인식을 시작하는 중...'}
+                        </span>
                     </div>
                 </div>
             )}
+
+            <div style={{ marginTop: '2rem', textAlign: 'center' }}>
+                <button onClick={handleQuit} className="btn-outline" style={{ fontSize: '0.9rem', color: '#999', border: 'none', background: 'transparent' }}>
+                    학습 중단하고 나가기
+                </button>
+            </div>
         </div>
     );
 }
