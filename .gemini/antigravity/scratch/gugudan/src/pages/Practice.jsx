@@ -15,14 +15,22 @@ const KOREAN_NUMBERS = {
 };
 
 const parseKoreanNumber = (text) => {
+    // 1. 숫자가 직접 포함된 경우 (예: "24", "정답은 42")
     let numStr = text.replace(/[^0-9]/g, '');
     if (numStr) return parseInt(numStr);
 
+    // 2. 한글 숫자인 경우 (예: "팔십일", "이십")
     let total = 0;
     let found = false;
-    for (const [word, val] of Object.entries(KOREAN_NUMBERS)) {
-        if (text.includes(word)) {
+
+    // 긴 단어(이십, 삼십...)부터 먼저 체크
+    const words = Object.entries(KOREAN_NUMBERS).sort((a, b) => b[0].length - a[0].length);
+
+    let tempText = text;
+    for (const [word, val] of words) {
+        if (tempText.includes(word)) {
             total += val;
+            tempText = tempText.replace(word, ''); // 이미 처리한 글자는 제거
             found = true;
         }
     }
@@ -54,10 +62,10 @@ export default function Practice() {
     const animationFrameRef = useRef(null);
     const activeRef = useRef(true);
 
-    // Ref to always have the latest state for handlers
-    const stateRef = useRef({ currentIndex, problems, feedback, gameOver, inputValue });
+    // Ref to always have the latest state for handlers (Speech Recognition)
+    const latest = useRef({ currentIndex, problems, feedback, gameOver, inputValue });
     useEffect(() => {
-        stateRef.current = { currentIndex, problems, feedback, gameOver, inputValue };
+        latest.current = { currentIndex, problems, feedback, gameOver, inputValue };
     }, [currentIndex, problems, feedback, gameOver, inputValue]);
 
     const mode = state?.mode || 'random';
@@ -105,49 +113,64 @@ export default function Practice() {
     };
 
     const handleAnswer = useCallback((val = null, isTimeout = false) => {
-        // Use Ref for current state to avoid being a dependency for everything else
-        const { currentIndex, problems, feedback, gameOver, inputValue } = stateRef.current;
-        if (feedback || gameOver || !problems[currentIndex]) return;
+        // Use the functional state pattern to avoid stale closures
+        setGameOver(currentGameOver => {
+            if (currentGameOver) return true;
 
-        const currentProblem = problems[currentIndex];
-        const answer = currentProblem.a * currentProblem.b;
-        const input = val !== null ? parseInt(val) : parseInt(inputValue);
+            setFeedback(currentFeedback => {
+                if (currentFeedback) return currentFeedback;
 
-        if (isNaN(input) && !isTimeout) return;
+                // We need problems and currentIndex here
+                const { currentIndex, problems } = latest.current;
+                const currentProblem = problems[currentIndex];
+                if (!currentProblem) return null;
 
-        const isCorrect = !isTimeout && input === answer;
+                const answer = currentProblem.a * currentProblem.b;
+                const input = val !== null ? parseInt(val) : parseInt(inputValue);
 
-        if (timerRef.current) clearInterval(timerRef.current);
-        setFeedback(isCorrect ? 'correct' : 'wrong');
-        updateStats(currentProblem.a, currentProblem.b, isCorrect);
+                if (isNaN(input) && !isTimeout) return null;
 
-        if (isCorrect) {
-            setStats(prev => ({ ...prev, correct: prev.correct + 1 }));
-            setCombo(prev => {
-                const nc = prev + 1;
-                if (nc > maxCombo) setMaxCombo(nc);
-                return nc;
+                const isCorrect = !isTimeout && input === answer;
+
+                if (timerRef.current) clearInterval(timerRef.current);
+                updateStats(currentProblem.a, currentProblem.b, isCorrect);
+
+                if (isCorrect) {
+                    setStats(prev => ({ ...prev, correct: prev.correct + 1 }));
+                    setCombo(prev => {
+                        const nc = prev + 1;
+                        if (nc > maxComboRef.current) maxComboRef.current = nc;
+                        return nc;
+                    });
+                    confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+                    setTimeout(() => nextProblem(), 800);
+                    return 'correct';
+                } else {
+                    setStats(prev => ({ ...prev, wrong: prev.wrong + 1 }));
+                    setCombo(0);
+                    wrongProblemsRef.current.push(currentProblem);
+                    setTimeout(() => nextProblem(), 2000);
+                    return 'wrong';
+                }
             });
-            confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
-            setTimeout(() => nextProblem(), 800);
-        } else {
-            setStats(prev => ({ ...prev, wrong: prev.wrong + 1 }));
-            setCombo(0);
-            wrongProblemsRef.current.push(currentProblem);
-            setTimeout(() => nextProblem(), 2000);
-        }
-    }, [updateStats, maxCombo]); // Dependencies reduced!
+            return false;
+        });
+    }, [updateStats, inputValue]);
+
+    // Used for maxCombo because it's hard to update in setCombo functional update
+    const maxComboRef = useRef(0);
 
     const nextProblem = useCallback(() => {
         if (!activeRef.current) return;
-        const { currentIndex, problems } = stateRef.current;
-        if (currentIndex + 1 >= problems.length) {
-            setGameOver(true);
-        } else {
-            setCurrentIndex(prev => prev + 1);
+        setCurrentIndex(prev => {
+            if (prev + 1 >= latest.current.problems.length) {
+                setGameOver(true);
+                return prev;
+            }
             setInputValue('');
             setFeedback(null);
-        }
+            return prev + 1;
+        });
     }, []);
 
     const startTimer = useCallback(() => {
@@ -167,19 +190,25 @@ export default function Practice() {
 
     const speakProblem = useCallback((a, b) => {
         if (!voiceEnabled) return;
+
         window.speechSynthesis.cancel();
+
         const msg = new SpeechSynthesisUtterance();
         msg.text = `${a} 곱하기 ${b}는?`;
         msg.lang = 'ko-KR';
-        msg.rate = 1.3;
-        window.speechSynthesis.speak(msg);
+        msg.rate = 1.0;
+        msg.volume = 1.0;
+
+        setTimeout(() => {
+            if (activeRef.current) window.speechSynthesis.speak(msg);
+        }, 150);
 
         if (recognitionRef.current) {
             try { recognitionRef.current.start(); } catch (e) { }
         }
     }, [voiceEnabled]);
 
-    // Initialize problems and voice
+    // 초기 설정
     useEffect(() => {
         if (!user) {
             navigate('/', { replace: true });
@@ -207,18 +236,27 @@ export default function Practice() {
             recognitionRef.current = new SpeechRecognition();
             recognitionRef.current.lang = 'ko-KR';
             recognitionRef.current.continuous = false;
-            recognitionRef.current.interimResults = false;
+            recognitionRef.current.interimResults = true;
 
             recognitionRef.current.onresult = (event) => {
-                const transcript = event.results[0][0].transcript.trim();
-                console.log("Speech Result:", transcript);
+                const { feedback, gameOver } = latest.current;
+                if (feedback || gameOver) return;
+
+                const results = event.results[event.results.length - 1];
+                const transcript = results[0].transcript.trim();
                 const number = parseKoreanNumber(transcript);
-                if (number !== null) handleAnswer(number);
+
+                if (number !== null) {
+                    setInputValue(String(number));
+                    if (results.isFinal) {
+                        handleAnswer(number);
+                    }
+                }
             };
 
             recognitionRef.current.onend = () => {
-                const { feedback, gameOver } = stateRef.current;
-                if (activeRef.current && !feedback && !gameOver) {
+                const { feedback, gameOver } = latest.current;
+                if (activeRef.current && !gameOver && !feedback) {
                     try { recognitionRef.current.start(); } catch (e) { }
                 }
             };
@@ -238,19 +276,20 @@ export default function Practice() {
         };
     }, []);
 
-    // Effect for Speaking PROBLEM - ONLY when currentIndex changes
+    // 문제 읽기 및 타이머 - currentIndex 또는 feedback이 바뀔 때 (feedback이 null이 될 때만)
     useEffect(() => {
         if (problems.length > 0 && currentIndex < problems.length && !gameOver && !feedback) {
             speakProblem(problems[currentIndex].a, problems[currentIndex].b);
-        }
-    }, [currentIndex, problems.length > 0]); // ONLY on new problem
-
-    // Effect for Timer - Start when feedback is cleared (i.e. new problem)
-    useEffect(() => {
-        if (problems.length > 0 && currentIndex < problems.length && !gameOver && !feedback) {
             startTimer();
         }
-    }, [currentIndex, feedback === null]);
+    }, [currentIndex, feedback === null, gameOver]);
+
+    // Effect for Timer - Start when feedback is cleared (i.e. new problem) - REMOVED, integrated into above useEffect
+    // useEffect(() => {
+    //     if (problems.length > 0 && currentIndex < problems.length && !gameOver && !feedback) {
+    //         startTimer();
+    //     }
+    // }, [currentIndex, feedback === null]);
 
     const handleKeypress = (key) => {
         if (feedback || gameOver) return;
@@ -271,7 +310,7 @@ export default function Practice() {
     if (gameOver) {
         return <ResultModal
             stats={stats}
-            maxCombo={maxCombo}
+            maxCombo={maxComboRef.current}
             wrongProblems={wrongProblemsRef.current}
             onHome={() => navigate('/dashboard', { replace: true })}
             onRetry={() => window.location.reload()}
