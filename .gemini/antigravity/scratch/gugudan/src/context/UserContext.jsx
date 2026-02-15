@@ -35,8 +35,21 @@ export const UserProvider = ({ children }) => {
         setUser(StorageService.getUser(user.name));
     };
 
+    const [settings, setSettings] = useState(() => {
+        const saved = localStorage.getItem('gugudan_settings');
+        return saved ? JSON.parse(saved) : { voiceEnabled: false };
+    });
+
+    useEffect(() => {
+        localStorage.setItem('gugudan_settings', JSON.stringify(settings));
+    }, [settings]);
+
+    const toggleVoice = () => {
+        setSettings(prev => ({ ...prev, voiceEnabled: !prev.voiceEnabled }));
+    };
+
     return (
-        <UserContext.Provider value={{ user, login, logout, updateStats }}>
+        <UserContext.Provider value={{ user, login, logout, updateStats, settings, toggleVoice }}>
             {children}
         </UserContext.Provider>
     );
