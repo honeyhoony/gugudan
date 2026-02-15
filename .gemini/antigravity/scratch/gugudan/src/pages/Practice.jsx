@@ -42,16 +42,57 @@ export default function Practice() {
     const [combo, setCombo] = useState(0);
     const [maxCombo, setMaxCombo] = useState(0);
     const [gameOver, setGameOver] = useState(false);
+    const [volume, setVolume] = useState(0);
 
     const wrongProblemsRef = useRef([]);
     const timerRef = useRef(null);
     const [timeLeft, setTimeLeft] = useState(10);
     const recognitionRef = useRef(null);
-    const activeRef = useRef(true); // To check if component is mounted and playing
+    const audioContextRef = useRef(null);
+    const analyserRef = useRef(null);
+    const streamRef = useRef(null);
+    const animationFrameRef = useRef(null);
+    const activeRef = useRef(true);
 
     const mode = state?.mode || 'random';
     const selectedDans = state?.dans || [2, 3, 4, 5, 6, 7, 8, 9];
     const voiceEnabled = settings?.voiceEnabled && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+    // Audio Analyzer Setup
+    const startVolumeMeter = async () => {
+        try {
+            if (!navigator.mediaDevices?.getUserMedia) return;
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            streamRef.current = stream;
+
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            const audioContext = new AudioContext();
+            audioContextRef.current = audioContext;
+
+            const analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
+            analyserRef.current = analyser;
+
+            const source = audioContext.createMediaStreamSource(stream);
+            source.connect(analyser);
+
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            const updateVolume = () => {
+                if (!activeRef.current) return;
+                analyser.getByteFrequencyData(dataArray);
+                let sum = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    sum += dataArray[i];
+                }
+                const average = sum / dataArray.length;
+                setVolume(average);
+                animationFrameRef.current = requestAnimationFrame(updateVolume);
+            };
+            updateVolume();
+        } catch (e) {
+            console.error("Audio meter error", e);
+        }
+    };
 
     // Initialize problems
     useEffect(() => {
@@ -81,6 +122,7 @@ export default function Practice() {
         setProblems(pList);
 
         if (voiceEnabled) {
+            startVolumeMeter();
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognitionRef.current = new SpeechRecognition();
             recognitionRef.current.lang = 'ko-KR';
@@ -113,6 +155,9 @@ export default function Practice() {
                 recognitionRef.current.onend = null; // Prevent restart after unmount
                 recognitionRef.current.stop();
             }
+            if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+            if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
+            if (audioContextRef.current) audioContextRef.current.close();
             window.speechSynthesis.cancel(); // Stop any ongoing speech
         };
     }, []);
@@ -261,10 +306,39 @@ export default function Practice() {
             )}
 
             {voiceEnabled && (
-                <div style={{ textAlign: 'center', fontSize: '0.8rem', opacity: 0.5, marginTop: '0.2rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                        <Mic size={14} color={activeRef.current ? '#3b82f6' : '#999'} />
-                        <span>말해서 답해보세요</span>
+                <div style={{ textAlign: 'center', marginTop: '0.4rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {/* Inner Circle pulsating with volume */}
+                            <div style={{
+                                position: 'absolute',
+                                width: '30px',
+                                height: '30px',
+                                borderRadius: '50%',
+                                background: 'rgba(59, 130, 246, 0.2)',
+                                transform: `scale(${1 + volume / 100})`,
+                                transition: 'transform 0.1s ease-out'
+                            }} />
+                            <Mic size={16} color="#3b82f6" style={{ position: 'relative', zIndex: 1 }} />
+                        </div>
+
+                        {/* Bars visualizer */}
+                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: '14px' }}>
+                            {[1, 2, 3, 4, 5, 6].map(i => {
+                                // Dynamic height based on volume
+                                const h = Math.min(100, (volume * (1 + i * 0.1)));
+                                return (
+                                    <div key={i} style={{
+                                        width: '3px',
+                                        height: `${Math.max(2, h / 4)}px`,
+                                        background: h > 50 ? '#3b82f6' : '#93c5fd',
+                                        borderRadius: '2px',
+                                        transition: 'height 0.05s ease-out'
+                                    }} />
+                                );
+                            })}
+                        </div>
+                        <span style={{ fontSize: '0.75rem', color: '#3b82f6', fontWeight: 'bold' }}>목소리 인식 중</span>
                     </div>
                 </div>
             )}
