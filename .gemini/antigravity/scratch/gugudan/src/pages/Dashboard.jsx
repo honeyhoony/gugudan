@@ -97,11 +97,11 @@ export default function Dashboard() {
                 )}
             </section>
 
-            {/* 2. 연습하기 & 실력 점검 설정 */}
+            {/* 2. 설정 */}
             <section style={{ marginBottom: '2.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                        <Brain size={24} color="var(--secondary)" /> 2. 연습 및 실전 설정
+                        <Brain size={24} color="var(--secondary)" /> 2. 설정
                     </h3>
                     <button
                         onClick={toggleVoice}
@@ -109,7 +109,7 @@ export default function Dashboard() {
                         style={{ padding: '0.4rem 0.8rem', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '5px', width: 'auto' }}
                     >
                         {settings.voiceEnabled ? <Mic size={16} /> : <MicOff size={16} />}
-                        음성인식 {settings.voiceEnabled ? 'ON' : 'OFF'}
+                        음성 {settings.voiceEnabled ? 'ON' : 'OFF'}
                     </button>
                 </div>
 
