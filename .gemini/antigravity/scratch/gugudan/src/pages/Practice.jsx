@@ -54,6 +54,12 @@ export default function Practice() {
     const animationFrameRef = useRef(null);
     const activeRef = useRef(true);
 
+    // Ref to always have the latest state for handlers
+    const stateRef = useRef({ currentIndex, problems, feedback, gameOver, inputValue });
+    useEffect(() => {
+        stateRef.current = { currentIndex, problems, feedback, gameOver, inputValue };
+    }, [currentIndex, problems, feedback, gameOver, inputValue]);
+
     const mode = state?.mode || 'random';
     const selectedDans = state?.dans || [2, 3, 4, 5, 6, 7, 8, 9];
     const voiceEnabled = settings?.voiceEnabled && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -63,6 +69,10 @@ export default function Practice() {
         try {
             if (!navigator.mediaDevices?.getUserMedia) return;
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            if (!activeRef.current) {
+                stream.getTracks().forEach(t => t.stop());
+                return;
+            }
             streamRef.current = stream;
 
             const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -94,93 +104,17 @@ export default function Practice() {
         }
     };
 
-    // Initialize problems
-    useEffect(() => {
-        if (!user) {
-            navigate('/', { replace: true });
-            return;
-        }
-
-        let pList = [];
-        if (mode === 'order') pList = GameLogic.getOrderProblems(selectedDans);
-        else if (mode === 'reverse') pList = GameLogic.getReverseProblems(selectedDans);
-        else if (mode === 'random') pList = GameLogic.getRandomProblems(30, selectedDans);
-        else if (mode === 'exam') pList = GameLogic.getRandomProblems(20, selectedDans);
-        else if (mode === 'retry-wrong') pList = state?.wrongProblems || [];
-        else pList = GameLogic.getRandomProblems(30, selectedDans);
-
-        if (pList.length === 0) {
-            if (selectedDans.length === 0) {
-                alert('연습할 단을 선택해주세요!');
-            } else if (mode === 'retry-wrong') {
-                alert('다시 풀 틀린 문제가 없습니다!');
-            }
-            navigate('/dashboard', { replace: true });
-            return;
-        }
-
-        setProblems(pList);
-
-        if (voiceEnabled) {
-            startVolumeMeter();
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            recognitionRef.current = new SpeechRecognition();
-            recognitionRef.current.lang = 'ko-KR';
-            recognitionRef.current.continuous = false; // Better for mobile to use false and restart
-            recognitionRef.current.interimResults = false;
-
-            recognitionRef.current.onresult = (event) => {
-                const transcript = event.results[0][0].transcript.trim();
-                const number = parseKoreanNumber(transcript);
-                if (number !== null) handleAnswer(number);
-            };
-
-            recognitionRef.current.onerror = (event) => {
-                console.error("Speech Recognition Error:", event.error);
-                // If no-speech, it will naturally end and restart if activeRef is true
-            };
-
-            recognitionRef.current.onend = () => {
-                // Restart if still playing and on same problem
-                if (activeRef.current && !feedback && !gameOver) {
-                    try { recognitionRef.current.start(); } catch (e) { console.log("Recognition restart error", e); }
-                }
-            };
-        }
-
-        return () => {
-            activeRef.current = false;
-            if (timerRef.current) clearInterval(timerRef.current);
-            if (recognitionRef.current) {
-                recognitionRef.current.onend = null; // Prevent restart after unmount
-                recognitionRef.current.stop();
-            }
-            if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-            if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
-            if (audioContextRef.current) audioContextRef.current.close();
-            window.speechSynthesis.cancel(); // Stop any ongoing speech
-        };
-    }, []);
-
-    const nextProblem = useCallback(() => {
-        if (!activeRef.current) return;
-        if (currentIndex + 1 >= problems.length) {
-            setGameOver(true);
-        } else {
-            setCurrentIndex(prev => prev + 1);
-            setInputValue('');
-            setFeedback(null);
-        }
-    }, [currentIndex, problems.length]);
-
     const handleAnswer = useCallback((val = null, isTimeout = false) => {
-        if (feedback || gameOver) return;
+        // Use Ref for current state to avoid being a dependency for everything else
+        const { currentIndex, problems, feedback, gameOver, inputValue } = stateRef.current;
+        if (feedback || gameOver || !problems[currentIndex]) return;
 
         const currentProblem = problems[currentIndex];
-        if (!currentProblem) return;
-
         const answer = currentProblem.a * currentProblem.b;
         const input = val !== null ? parseInt(val) : parseInt(inputValue);
+
+        if (isNaN(input) && !isTimeout) return;
+
         const isCorrect = !isTimeout && input === answer;
 
         if (timerRef.current) clearInterval(timerRef.current);
@@ -202,7 +136,19 @@ export default function Practice() {
             wrongProblemsRef.current.push(currentProblem);
             setTimeout(() => nextProblem(), 2000);
         }
-    }, [currentIndex, problems, feedback, gameOver, inputValue, maxCombo, nextProblem, updateStats]);
+    }, [updateStats, maxCombo]); // Dependencies reduced!
+
+    const nextProblem = useCallback(() => {
+        if (!activeRef.current) return;
+        const { currentIndex, problems } = stateRef.current;
+        if (currentIndex + 1 >= problems.length) {
+            setGameOver(true);
+        } else {
+            setCurrentIndex(prev => prev + 1);
+            setInputValue('');
+            setFeedback(null);
+        }
+    }, []);
 
     const startTimer = useCallback(() => {
         if (timerRef.current) clearInterval(timerRef.current);
@@ -225,20 +171,86 @@ export default function Practice() {
         const msg = new SpeechSynthesisUtterance();
         msg.text = `${a} 곱하기 ${b}는?`;
         msg.lang = 'ko-KR';
-        msg.rate = 1.2;
+        msg.rate = 1.3;
         window.speechSynthesis.speak(msg);
 
         if (recognitionRef.current) {
-            try { recognitionRef.current.start(); } catch (e) { console.log("Recognition start error", e); }
+            try { recognitionRef.current.start(); } catch (e) { }
         }
     }, [voiceEnabled]);
 
+    // Initialize problems and voice
+    useEffect(() => {
+        if (!user) {
+            navigate('/', { replace: true });
+            return;
+        }
+
+        let pList = [];
+        if (mode === 'order') pList = GameLogic.getOrderProblems(selectedDans);
+        else if (mode === 'reverse') pList = GameLogic.getReverseProblems(selectedDans);
+        else if (mode === 'random') pList = GameLogic.getRandomProblems(30, selectedDans);
+        else if (mode === 'exam') pList = GameLogic.getRandomProblems(20, selectedDans);
+        else if (mode === 'retry-wrong') pList = state?.wrongProblems || [];
+        else pList = GameLogic.getRandomProblems(30, selectedDans);
+
+        if (pList.length === 0) {
+            navigate('/dashboard', { replace: true });
+            return;
+        }
+
+        setProblems(pList);
+
+        if (voiceEnabled) {
+            startVolumeMeter();
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognitionRef.current = new SpeechRecognition();
+            recognitionRef.current.lang = 'ko-KR';
+            recognitionRef.current.continuous = false;
+            recognitionRef.current.interimResults = false;
+
+            recognitionRef.current.onresult = (event) => {
+                const transcript = event.results[0][0].transcript.trim();
+                console.log("Speech Result:", transcript);
+                const number = parseKoreanNumber(transcript);
+                if (number !== null) handleAnswer(number);
+            };
+
+            recognitionRef.current.onend = () => {
+                const { feedback, gameOver } = stateRef.current;
+                if (activeRef.current && !feedback && !gameOver) {
+                    try { recognitionRef.current.start(); } catch (e) { }
+                }
+            };
+        }
+
+        return () => {
+            activeRef.current = false;
+            if (timerRef.current) clearInterval(timerRef.current);
+            if (recognitionRef.current) {
+                recognitionRef.current.onend = null;
+                recognitionRef.current.stop();
+            }
+            if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+            if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
+            if (audioContextRef.current) audioContextRef.current.close();
+            window.speechSynthesis.cancel();
+        };
+    }, []);
+
+    // Effect for Speaking PROBLEM - ONLY when currentIndex changes
+    useEffect(() => {
+        if (problems.length > 0 && currentIndex < problems.length && !gameOver && !feedback) {
+            speakProblem(problems[currentIndex].a, problems[currentIndex].b);
+        }
+    }, [currentIndex, problems.length > 0]); // ONLY on new problem
+
+    // Effect for Timer - Start when feedback is cleared (i.e. new problem)
     useEffect(() => {
         if (problems.length > 0 && currentIndex < problems.length && !gameOver && !feedback) {
             startTimer();
-            speakProblem(problems[currentIndex].a, problems[currentIndex].b);
         }
-    }, [currentIndex, problems.length, gameOver, feedback, startTimer, speakProblem, problems]);
+    }, [currentIndex, feedback === null]);
 
     const handleKeypress = (key) => {
         if (feedback || gameOver) return;
