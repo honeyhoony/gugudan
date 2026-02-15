@@ -25,17 +25,16 @@ export default function Dashboard() {
         });
     };
 
-    const handlePractice = (mode, dan = null) => {
-        if ((mode === 'exam' || mode === 'random') && examDans.length === 0) {
+    const handlePractice = (mode) => {
+        if (examDans.length === 0) {
             alert('최소 하나 이상의 단을 선택해주세요!');
             return;
         }
 
         navigate('/practice', {
             state: {
-                mode: mode, // 'order', 'reverse', 'random', 'exam'
-                dan: dan,
-                dans: (mode === 'exam' || mode === 'random') ? examDans : [dan],
+                mode: mode,
+                dans: examDans,
                 voiceEnabled: settings.voiceEnabled
             }
         });
@@ -44,7 +43,7 @@ export default function Dashboard() {
     return (
         <div className="card animate-pop" style={{ maxWidth: '600px', width: '95%', margin: '0 auto' }}>
             {/* Header */}
-            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
                 <h1 style={{ fontSize: '2.2rem', marginBottom: '0.5rem' }}>🎯 구구단 마스터</h1>
                 <p style={{ opacity: 0.8 }}>반가워요, {user.name}!</p>
             </div>

@@ -212,7 +212,10 @@ export default function Practice() {
     const handleQuit = () => {
         if (window.confirm("정말 그만둘까요?")) {
             if (timerRef.current) clearInterval(timerRef.current);
-            if (recognitionRef.current) recognitionRef.current.stop();
+            if (recognitionRef.current) {
+                recognitionRef.current.onend = null;
+                recognitionRef.current.stop();
+            }
             navigate('/dashboard', { replace: true });
         }
     };
@@ -227,79 +230,90 @@ export default function Practice() {
         />;
     }
 
-    if (problems.length === 0) return <div className="animate-spin">로딩중...</div>;
+    if (problems.length === 0) return <div style={{ textAlign: 'center', marginTop: '5rem', fontSize: '1.2rem' }}>로딩중...</div>;
 
     const currentProblem = problems[currentIndex];
 
     return (
-        <div className="card animate-pop" style={{ maxWidth: '500px', width: '95%', margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
-            <button onClick={handleQuit} className="btn-outline" style={{ position: 'absolute', right: '0.8rem', top: '0.8rem', padding: '0.4rem', border: 'none', background: 'transparent', color: '#666', zIndex: 10 }}>
-                <X size={24} />
-            </button>
-
-            <div className="stats-badge" style={{ top: '1rem', left: '1rem', background: '#333', color: '#fff', fontSize: '0.9rem', padding: '0.3rem 0.8rem' }}>
-                {currentIndex + 1} / {problems.length}
+        <div className="card animate-pop" style={{
+            maxWidth: '500px',
+            width: '95%',
+            margin: '0 auto',
+            position: 'relative',
+            padding: '1rem 1.5rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem'
+        }}>
+            {/* Header Mini */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="stats-badge" style={{
+                    position: 'static',
+                    background: '#333',
+                    color: '#fff',
+                    fontSize: '0.8rem',
+                    padding: '0.2rem 0.6rem',
+                    borderRadius: '20px'
+                }}>
+                    {currentIndex + 1} / {problems.length}
+                </div>
+                <button onClick={handleQuit} style={{ border: 'none', background: 'transparent', color: '#999', cursor: 'pointer' }}>
+                    <X size={20} />
+                </button>
             </div>
 
-            {/* Timer Progress Bar */}
-            <div style={{
-                width: '100%',
-                height: '10px',
-                background: 'rgba(255,255,255,0.1)',
-                borderRadius: '5px',
-                marginTop: '3.5rem',
-                overflow: 'hidden',
-                border: '1px solid rgba(0,0,0,0.05)'
-            }}>
+            {/* Timer Mini */}
+            <div style={{ marginTop: '0.5rem' }}>
                 <div style={{
-                    width: `${(timeLeft / 10) * 100}%`,
-                    height: '100%',
-                    background: timeLeft < 3 ? 'var(--error)' : 'var(--primary)',
-                    transition: 'width 0.1s linear'
-                }} />
-            </div>
-            <div style={{ textAlign: 'center', marginTop: '8px', fontSize: '1rem', fontWeight: 'bold', color: timeLeft < 3 ? 'var(--error)' : 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
-                <Timer size={16} /> {Math.ceil(timeLeft)}초 남음
+                    width: '100%',
+                    height: '6px',
+                    background: 'rgba(255,255,255,0.1)',
+                    borderRadius: '3px',
+                    overflow: 'hidden'
+                }}>
+                    <div style={{
+                        width: `${(timeLeft / 10) * 100}%`,
+                        height: '100%',
+                        background: timeLeft < 3 ? '#ff4757' : 'var(--primary)',
+                        transition: 'width 0.1s linear'
+                    }} />
+                </div>
+                <div style={{ textAlign: 'center', marginTop: '4px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', opacity: 0.8 }}>
+                    <Timer size={12} /> {Math.ceil(timeLeft)}s
+                </div>
             </div>
 
-            <div style={{ marginTop: '1rem', marginBottom: '0.5rem', minHeight: '35px', textAlign: 'center' }}>
-                {combo > 1 && (
-                    <div className="animate-pop" style={{ color: '#ff4757', fontWeight: '900', fontSize: '1.6rem', textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-                        🔥 {combo} 연속 정답! 🔥
+            {/* Feedback / Combo Area - Fixed Height to prevent jumping */}
+            <div style={{ minHeight: '30px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {combo > 1 && !feedback && (
+                    <div className="animate-pop" style={{ color: '#ff4757', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                        🔥 {combo}연속!
+                    </div>
+                )}
+                {feedback === 'wrong' && (
+                    <div className="animate-pop" style={{ color: 'var(--error)', fontWeight: 'bold', fontSize: '1rem', background: 'rgba(255,71,87,0.1)', padding: '2px 10px', borderRadius: '4px' }}>
+                        땡! 정답: {currentProblem.a * currentProblem.b}
+                    </div>
+                )}
+                {feedback === 'correct' && (
+                    <div className="animate-pop" style={{ color: 'var(--primary)', fontWeight: 'bold', fontSize: '1rem', background: 'rgba(59,130,246,0.1)', padding: '2px 10px', borderRadius: '4px' }}>
+                        정답! 👏
                     </div>
                 )}
             </div>
 
+            {/* Question Area */}
             <div className={`problem-display ${feedback === 'correct' ? 'animate-pop' : ''}`} style={{
-                fontSize: 'clamp(3rem, 15vw, 4.5rem)',
+                fontSize: '3.5rem',
                 textAlign: 'center',
-                marginBottom: '1rem',
+                margin: '0.5rem 0',
                 fontWeight: 'bold',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
+                whiteSpace: 'nowrap'
             }}>
                 {currentProblem.a} × {currentProblem.b} = <span style={{ color: feedback === 'wrong' ? 'var(--error)' : 'inherit' }}>{inputValue || '?'}</span>
             </div>
 
-            <div style={{ minHeight: '60px', marginBottom: '1rem' }}>
-                {feedback === 'wrong' && (
-                    <div className="animate-pop" style={{ textAlign: 'center' }}>
-                        <div style={{ color: 'var(--error)', fontSize: '1.5rem', fontWeight: 'bold', background: 'rgba(255,71,87,0.1)', padding: '0.5rem', borderRadius: '8px' }}>
-                            땡! 정답은 {currentProblem.a * currentProblem.b}
-                        </div>
-                    </div>
-                )}
-
-                {feedback === 'correct' && (
-                    <div className="animate-pop" style={{ textAlign: 'center' }}>
-                        <div style={{ color: 'var(--primary)', fontSize: '1.5rem', fontWeight: 'bold', background: 'rgba(59,130,246,0.1)', padding: '0.5rem', borderRadius: '8px' }}>
-                            정답! 대단해요! 👏
-                        </div>
-                    </div>
-                )}
-            </div>
-
+            {/* Keypad */}
             {!feedback && (
                 <NumericKeypad
                     onPress={handleKeypress}
@@ -309,22 +323,15 @@ export default function Practice() {
                 />
             )}
 
+            {/* Voice Info Mini */}
             {voiceEnabled && (
-                <div style={{ marginTop: '1.5rem', textAlign: 'center', background: isListening ? 'rgba(59,130,246,0.05)' : 'transparent', padding: '0.8rem', borderRadius: '12px', transition: 'all 0.3s' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: isListening ? 'var(--primary)' : '#666' }}>
-                        {isListening ? <Mic className="animate-pulse" size={20} /> : <MicOff size={20} />}
-                        <span style={{ fontWeight: isListening ? 'bold' : 'normal' }}>
-                            {isListening ? '듣고 있어요... 숫자를 말씀하세요' : '음성 인식을 시작하는 중...'}
-                        </span>
+                <div style={{ marginTop: '0.5rem', textAlign: 'center', fontSize: '0.8rem', opacity: 0.6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                        {isListening ? <Mic className="animate-pulse" color="var(--primary)" size={14} /> : <MicOff size={14} />}
+                        <span>{isListening ? '듣고 있어요' : '음성 로딩 중...'}</span>
                     </div>
                 </div>
             )}
-
-            <div style={{ marginTop: '2rem', textAlign: 'center' }}>
-                <button onClick={handleQuit} className="btn-outline" style={{ fontSize: '0.9rem', color: '#999', border: 'none', background: 'transparent' }}>
-                    학습 중단하고 나가기
-                </button>
-            </div>
         </div>
     );
 }
