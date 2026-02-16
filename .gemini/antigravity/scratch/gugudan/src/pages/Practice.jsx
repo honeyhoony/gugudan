@@ -70,6 +70,7 @@ export default function Practice() {
     const streamRef = useRef(null);
     const animationFrameRef = useRef(null);
     const activeRef = useRef(true);
+    const processingAnswerRef = useRef(false);
 
     // Ref to always have the latest state for handlers (Speech Recognition)
     const latest = useRef({ currentIndex, problems, feedback, gameOver, inputValue });
@@ -123,6 +124,12 @@ export default function Practice() {
     };
 
     const handleAnswer = useCallback((val = null, isTimeout = false) => {
+        // Stop recognition immediately to prevent carry-over
+        if (recognitionRef.current) {
+            recognitionRef.current.abort();
+        }
+        processingAnswerRef.current = true;
+
         // Use the functional state pattern to avoid stale closures
         setGameOver(currentGameOver => {
             if (currentGameOver) return true;
@@ -138,7 +145,10 @@ export default function Practice() {
                 const answer = currentProblem.a * currentProblem.b;
                 const input = val !== null ? parseInt(val) : parseInt(inputValue);
 
-                if (isNaN(input) && !isTimeout) return null;
+                if (isNaN(input) && !isTimeout) {
+                    processingAnswerRef.current = false; // Reset if not submitting
+                    return null;
+                }
 
                 const isCorrect = !isTimeout && input === answer;
 
@@ -183,7 +193,7 @@ export default function Practice() {
             });
             return false;
         });
-    }, [updateStats, inputValue, mode]);
+    }, [updateStats, inputValue, mode, settings.sfxEnabled]);
 
     const handleAnswerRef = useRef(handleAnswer);
     useEffect(() => {
@@ -227,6 +237,8 @@ export default function Practice() {
 
     const nextProblem = useCallback(() => {
         if (!activeRef.current) return;
+        processingAnswerRef.current = false; // Allow audio processing again
+
         setCurrentIndex(prev => {
             if (prev + 1 >= latest.current.problems.length) {
                 setGameOver(true);
@@ -258,7 +270,7 @@ export default function Practice() {
                 return nextTime;
             });
         }, 100);
-    }, [handleAnswer, maxTime]);
+    }, [handleAnswer, maxTime, mode, settings.sfxEnabled]);
 
     const speakProblem = useCallback((a, b) => {
         if (!settings.ttsEnabled) return;
@@ -286,7 +298,7 @@ export default function Practice() {
         if (recognitionRef.current) {
             try { recognitionRef.current.start(); } catch (e) { }
         }
-    }, [voiceEnabled]);
+    }, [settings.ttsEnabled, voiceEnabled]);
 
     // 초기 설정
     useEffect(() => {
@@ -319,7 +331,9 @@ export default function Practice() {
 
             recognitionRef.current.onresult = (event) => {
                 const { currentIndex, problems, feedback, gameOver } = latest.current;
-                if (feedback || gameOver) return;
+
+                // Block if already processing an answer or in feedback state
+                if (feedback || gameOver || processingAnswerRef.current) return;
 
                 const results = event.results[event.results.length - 1];
                 const transcript = results[0].transcript.trim();
@@ -349,7 +363,8 @@ export default function Practice() {
 
             recognitionRef.current.onend = () => {
                 const { feedback, gameOver } = latest.current;
-                if (activeRef.current && !gameOver && !feedback) {
+                // Only restart if we are NOT processing an answer and NOT in feedback/gameover
+                if (activeRef.current && !gameOver && !feedback && !processingAnswerRef.current) {
                     try { recognitionRef.current.start(); } catch (e) { }
                 }
             };
