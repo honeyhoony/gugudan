@@ -131,6 +131,11 @@ export default function Learn() {
             setHighlightedStep(null);
             window.speechSynthesis.cancel();
         } else {
+            // Mobile TTS fix: Wake up synth on user gesture
+            const dummy = new SpeechSynthesisUtterance('');
+            dummy.volume = 0;
+            window.speechSynthesis.speak(dummy);
+
             setIsPlaying(true);
             playSequence(0);
         }
