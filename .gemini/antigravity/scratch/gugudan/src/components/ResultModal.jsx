@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 import { RotateCcw, Home, Brain } from 'lucide-react';
 import { AudioService } from '../lib/audioService';
+import { useUser } from '../context/UserContext';
 
 export default function ResultModal({ stats, maxCombo, wrongProblems = [], onHome, onRetry }) {
+    const { settings } = useUser();
     const mounted = useRef(false);
     const navigate = useNavigate();
 
@@ -17,7 +19,7 @@ export default function ResultModal({ stats, maxCombo, wrongProblems = [], onHom
 
             // Celebratory effects for high scores (90+)
             if (score >= 90) {
-                AudioService.playPerfectSound();
+                if (settings.sfxEnabled) AudioService.playPerfectSound();
 
                 const duration = 5000;
                 const animationEnd = Date.now() + duration;

@@ -77,7 +77,7 @@ export default function Practice() {
 
     const mode = state?.mode || 'random';
     const selectedDans = state?.dans || [2, 3, 4, 5, 6, 7, 8, 9];
-    const voiceEnabled = settings?.voiceEnabled && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+    const voiceEnabled = settings?.micEnabled && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
     const maxTime = 20; // Increased to 20s for ample correction time
 
     // Audio Analyzer Setup
@@ -150,14 +150,14 @@ export default function Practice() {
                         if (nc > maxComboRef.current) maxComboRef.current = nc;
                         return nc;
                     });
-                    AudioService.playCorrectSound();
+                    if (settings.sfxEnabled) AudioService.playCorrectSound();
                     confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
                     setTimeout(() => nextProblem(), 1200); // Slightly longer for the cheer sound
                     return 'correct';
                 } else {
                     setStats(prev => ({ ...prev, wrong: prev.wrong + 1 }));
                     setCombo(0);
-                    AudioService.playWrongSound();
+                    if (settings.sfxEnabled) AudioService.playWrongSound();
                     wrongProblemsRef.current.push(currentProblem);
 
                     if (mode === 'exam') {
@@ -215,7 +215,7 @@ export default function Practice() {
     }, [handleAnswer, maxTime]);
 
     const speakProblem = useCallback((a, b) => {
-        if (!voiceEnabled) return;
+        if (!settings.ttsEnabled) return;
 
         window.speechSynthesis.cancel();
 
@@ -264,7 +264,7 @@ export default function Practice() {
 
         setProblems(pList);
 
-        if (mode === 'exam') {
+        if (mode === 'exam' && settings.sfxEnabled) {
             AudioService.startExamBGM();
         }
 
@@ -329,23 +329,25 @@ export default function Practice() {
         };
     }, []);
 
-    // 문제 읽기 및 타이머 - currentIndex 또는 feedback이 바뀔 때 (feedback이 null이 될 때만)
     useEffect(() => {
         if (!gameStarted) return;
         if (gameOver) {
-            AudioService.stopBGM();
+            if (settings.sfxEnabled) AudioService.stopBGM();
             return;
         }
         if (problems.length > 0 && currentIndex < problems.length && !gameOver && !feedback) {
             speakProblem(problems[currentIndex].a, problems[currentIndex].b);
             startTimer();
         }
-    }, [gameStarted, currentIndex, feedback === null, gameOver]);
+    }, [gameStarted, currentIndex, feedback === null, gameOver, settings.ttsEnabled, settings.sfxEnabled]);
 
     const handleStartGame = () => {
         setGameStarted(true);
         AudioService.init();
-        if (mode === 'exam') {
+        if (voiceEnabled) {
+            startVolumeMeter();
+        }
+        if (mode === 'exam' && settings.sfxEnabled) {
             AudioService.startExamBGM();
         }
     };

@@ -8,7 +8,6 @@ export const UserProvider = ({ children }) => {
 
     // Load last user or ask for login
     useEffect(() => {
-        // Check if 'currentUser' exists in localStorage separate from 'users'
         const stored = localStorage.getItem('gugudan_currentUser');
         if (stored) {
             const u = StorageService.getUser(stored);
@@ -31,40 +30,42 @@ export const UserProvider = ({ children }) => {
     const updateStats = (a, b, isCorrect) => {
         if (!user) return;
         StorageService.updateStats(user.name, a, b, isCorrect);
-        // Refresh user state
         setUser(StorageService.getUser(user.name));
     };
 
     const [settings, setSettings] = useState(() => {
         const saved = localStorage.getItem('gugudan_settings');
-        return saved ? JSON.parse(saved) : { voiceEnabled: false };
+        return saved ? JSON.parse(saved) : {
+            micEnabled: false,  // 사용자 마이크 입력
+            ttsEnabled: true,   // 성우 문제 읽기
+            sfxEnabled: true    // 효과음 및 BGM
+        };
     });
 
     useEffect(() => {
         localStorage.setItem('gugudan_settings', JSON.stringify(settings));
     }, [settings]);
 
-    const toggleVoice = async () => {
-        const nextState = !settings.voiceEnabled;
+    const toggleSetting = async (key) => {
+        const nextState = !settings[key];
 
-        if (nextState) {
+        // Handle microphone permission when turning MIC on
+        if (key === 'micEnabled' && nextState) {
             try {
-                // Request microphone permission ONLY when turning voice ON in main dashboard
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                // Stop it immediately, we just wanted to trigger the permission prompt
                 stream.getTracks().forEach(track => track.stop());
             } catch (err) {
                 console.error("Microphone permission denied:", err);
-                alert("마이크 권한이 필요합니다. 브라우저 설정에서 마이크를 허용해주세요.");
+                alert("마이크 권한이 필요합니다. 설정에서 허용해주세요.");
                 return;
             }
         }
 
-        setSettings(prev => ({ ...prev, voiceEnabled: nextState }));
+        setSettings(prev => ({ ...prev, [key]: nextState }));
     };
 
     return (
-        <UserContext.Provider value={{ user, login, logout, updateStats, settings, toggleVoice }}>
+        <UserContext.Provider value={{ user, login, logout, updateStats, settings, toggleSetting }}>
             {children}
         </UserContext.Provider>
     );

@@ -4,7 +4,7 @@ import { useUser } from '../context/UserContext';
 import { BookOpen, Target, Brain, Mic, MicOff, List, RotateCcw, Shuffle, Trophy } from 'lucide-react';
 
 export default function Dashboard() {
-    const { user, settings, toggleVoice } = useUser();
+    const { user, settings, toggleSetting } = useUser();
     const navigate = useNavigate();
     const [selectedDan, setSelectedDan] = useState(null);
     const [showSelection, setShowSelection] = useState(false);
@@ -99,18 +99,39 @@ export default function Dashboard() {
 
             {/* 2. 설정 */}
             <section style={{ marginBottom: '2.5rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                        <Brain size={24} color="var(--secondary)" /> 2. 설정
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
+                        <Brain size={24} color="var(--secondary)" /> 2. 오디오 설정
                     </h3>
-                    <button
-                        onClick={toggleVoice}
-                        className={`btn ${settings.voiceEnabled ? 'btn-secondary' : 'btn-outline'}`}
-                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '5px', width: 'auto' }}
-                    >
-                        {settings.voiceEnabled ? <Mic size={16} /> : <MicOff size={16} />}
-                        음성 {settings.voiceEnabled ? 'ON' : 'OFF'}
-                    </button>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                        <button
+                            onClick={() => toggleSetting('micEnabled')}
+                            className={`btn ${settings.micEnabled ? 'btn-secondary' : 'btn-outline'}`}
+                            style={{ padding: '0.6rem 0.2rem', fontSize: '0.8rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}
+                        >
+                            {settings.micEnabled ? <Mic size={20} /> : <MicOff size={20} />}
+                            마이크 {settings.micEnabled ? 'ON' : 'OFF'}
+                        </button>
+
+                        <button
+                            onClick={() => toggleSetting('ttsEnabled')}
+                            className={`btn ${settings.ttsEnabled ? 'btn-secondary' : 'btn-outline'}`}
+                            style={{ padding: '0.6rem 0.2rem', fontSize: '0.8rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}
+                        >
+                            <Brain size={20} />
+                            성우 {settings.ttsEnabled ? 'ON' : 'OFF'}
+                        </button>
+
+                        <button
+                            onClick={() => toggleSetting('sfxEnabled')}
+                            className={`btn ${settings.sfxEnabled ? 'btn-secondary' : 'btn-outline'}`}
+                            style={{ padding: '0.6rem 0.2rem', fontSize: '0.8rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}
+                        >
+                            <Trophy size={20} />
+                            효과음 {settings.sfxEnabled ? 'ON' : 'OFF'}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Range Selection Shared */}
