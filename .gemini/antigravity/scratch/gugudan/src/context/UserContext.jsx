@@ -35,11 +35,17 @@ export const UserProvider = ({ children }) => {
 
     const [settings, setSettings] = useState(() => {
         const saved = localStorage.getItem('gugudan_settings');
-        return saved ? JSON.parse(saved) : {
-            micEnabled: false,  // 사용자 마이크 입력
-            ttsEnabled: true,   // 성우 문제 읽기
-            sfxEnabled: true    // 효과음 및 BGM
+        const defaultSettings = {
+            micEnabled: false,
+            ttsEnabled: true,
+            sfxEnabled: true,
+            inputMethod: 'keypad'
         };
+        if (!saved) return defaultSettings;
+
+        const parsed = JSON.parse(saved);
+        // Ensure new fields are present
+        return { ...defaultSettings, ...parsed };
     });
 
     useEffect(() => {
@@ -49,7 +55,6 @@ export const UserProvider = ({ children }) => {
     const toggleSetting = async (key) => {
         const nextState = !settings[key];
 
-        // Handle microphone permission when turning MIC on
         if (key === 'micEnabled' && nextState) {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -64,8 +69,12 @@ export const UserProvider = ({ children }) => {
         setSettings(prev => ({ ...prev, [key]: nextState }));
     };
 
+    const setSetting = (key, value) => {
+        setSettings(prev => ({ ...prev, [key]: value }));
+    };
+
     return (
-        <UserContext.Provider value={{ user, login, logout, updateStats, settings, toggleSetting }}>
+        <UserContext.Provider value={{ user, login, logout, updateStats, settings, toggleSetting, setSetting }}>
             {children}
         </UserContext.Provider>
     );

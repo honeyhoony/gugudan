@@ -6,6 +6,7 @@ import confetti from 'canvas-confetti';
 import { X, Mic, MicOff, Timer } from 'lucide-react';
 import ResultModal from '../components/ResultModal';
 import NumericKeypad from '../components/NumericKeypad';
+import MultipleChoice from '../components/MultipleChoice';
 import { AudioService } from '../lib/audioService';
 
 const KOREAN_NUMBERS = {
@@ -58,6 +59,7 @@ export default function Practice() {
     const [volume, setVolume] = useState(0);
     const [lives, setLives] = useState(5);
     const [gameStarted, setGameStarted] = useState(false);
+    const [options, setOptions] = useState([]);
 
     const wrongProblemsRef = useRef([]);
     const timerRef = useRef(null);
@@ -190,6 +192,35 @@ export default function Practice() {
 
     // Used for maxCombo because it's hard to update in setCombo functional update
     const maxComboRef = useRef(0);
+
+    const generateOptions = useCallback((currentProblem) => {
+        if (!currentProblem) return;
+        const answer = currentProblem.a * currentProblem.b;
+        const choices = new Set();
+        choices.add(answer);
+
+        while (choices.size < 4) {
+            // Generate plausible wrong answers
+            // Often nearby numbers or numbers from the same multiplication table
+            let wrong;
+            const seed = Math.random();
+            if (seed < 0.3) {
+                // Correct Dan, wrong multiplier
+                wrong = currentProblem.a * (Math.floor(Math.random() * 9) + 1);
+            } else if (seed < 0.6) {
+                // Nearby number
+                wrong = answer + (Math.floor(Math.random() * 5) + 1) * (Math.random() < 0.5 ? 1 : -1);
+            } else {
+                // Purely random result from 2-9 table
+                wrong = (Math.floor(Math.random() * 8) + 2) * (Math.floor(Math.random() * 8) + 2);
+            }
+
+            if (wrong > 0 && !choices.has(wrong)) {
+                choices.add(wrong);
+            }
+        }
+        setOptions(Array.from(choices).sort(() => Math.random() - 0.5));
+    }, []);
 
     const nextProblem = useCallback(() => {
         if (!activeRef.current) return;
@@ -343,10 +374,13 @@ export default function Practice() {
             return;
         }
         if (problems.length > 0 && currentIndex < problems.length && !gameOver && !feedback) {
+            if (settings.inputMethod === 'choice') {
+                generateOptions(problems[currentIndex]);
+            }
             speakProblem(problems[currentIndex].a, problems[currentIndex].b);
             startTimer();
         }
-    }, [gameStarted, currentIndex, feedback === null, gameOver, settings.ttsEnabled, settings.sfxEnabled]);
+    }, [gameStarted, currentIndex, feedback === null, gameOver, settings.ttsEnabled, settings.sfxEnabled, settings.inputMethod]);
 
     const handleStartGame = () => {
         setGameStarted(true);
@@ -460,13 +494,24 @@ export default function Practice() {
                 {currentProblem.a} × {currentProblem.b} = <span style={{ color: feedback === 'wrong' ? '#ef4444' : 'inherit' }}>{inputValue || '?'}</span>
             </div>
 
-            {!feedback && (
-                <NumericKeypad
-                    onPress={handleKeypress}
-                    onBackspace={handleBackspace}
-                    onSubmit={() => handleAnswer()}
-                    value={inputValue}
+            {settings.inputMethod === 'choice' ? (
+                <MultipleChoice
+                    options={options}
+                    onSelect={(val) => {
+                        setInputValue(String(val));
+                        handleAnswer(val);
+                    }}
+                    disabled={!!feedback || gameOver}
                 />
+            ) : (
+                !feedback && (
+                    <NumericKeypad
+                        onPress={handleKeypress}
+                        onBackspace={handleBackspace}
+                        onSubmit={() => handleAnswer()}
+                        value={inputValue}
+                    />
+                )
             )}
 
             {voiceEnabled && (

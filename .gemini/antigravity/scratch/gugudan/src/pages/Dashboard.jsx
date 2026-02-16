@@ -4,7 +4,7 @@ import { useUser } from '../context/UserContext';
 import { BookOpen, Target, Brain, Mic, MicOff, List, RotateCcw, Shuffle, Trophy } from 'lucide-react';
 
 export default function Dashboard() {
-    const { user, settings, toggleSetting } = useUser();
+    const { user, settings, toggleSetting, setSetting } = useUser();
     const navigate = useNavigate();
     const [selectedDan, setSelectedDan] = useState(null);
     const [showSelection, setShowSelection] = useState(false);
@@ -131,6 +131,26 @@ export default function Dashboard() {
                             <Trophy size={20} />
                             효과음 {settings.sfxEnabled ? 'ON' : 'OFF'}
                         </button>
+                    </div>
+
+                    <div style={{ marginTop: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                        <p style={{ fontSize: '0.9rem', fontWeight: 'bold', margin: 0, opacity: 0.8 }}>🔢 입력 방식</p>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                            <button
+                                onClick={() => setSetting('inputMethod', 'keypad')}
+                                className={`btn ${settings.inputMethod === 'keypad' ? 'btn-secondary' : 'btn-outline'}`}
+                                style={{ padding: '0.8rem', fontSize: '0.9rem' }}
+                            >
+                                계산기 키패드
+                            </button>
+                            <button
+                                onClick={() => setSetting('inputMethod', 'choice')}
+                                className={`btn ${settings.inputMethod === 'choice' ? 'btn-secondary' : 'btn-outline'}`}
+                                style={{ padding: '0.8rem', fontSize: '0.9rem' }}
+                            >
+                                4지선다 선택지
+                            </button>
+                        </div>
                     </div>
                 </div>
 
