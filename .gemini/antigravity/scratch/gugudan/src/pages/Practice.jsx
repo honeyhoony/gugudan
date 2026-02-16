@@ -6,12 +6,17 @@ import confetti from 'canvas-confetti';
 import { X, Mic, MicOff, Timer } from 'lucide-react';
 import ResultModal from '../components/ResultModal';
 import NumericKeypad from '../components/NumericKeypad';
+import { AudioService } from '../lib/audioService';
 
 const KOREAN_NUMBERS = {
     '영': 0, '공': 0, '일': 1, '하나': 1, '이': 2, '둘': 2, '삼': 3, '셋': 3,
     '사': 4, '넷': 4, '오': 5, '다섯': 5, '육': 6, '여섯': 6, '칠': 7, '일곱': 7,
     '팔': 8, '여덟': 8, '구': 9, '아홉': 9, '십': 10,
     '이십': 20, '삼십': 30, '사십': 40, '오십': 50, '육십': 60, '칠십': 70, '팔십': 80, '구십': 90
+};
+
+const KOREAN_NAMES = {
+    1: '일', 2: '이', 3: '삼', 4: '사', 5: '오', 6: '육', 7: '칠', 8: '팔', 9: '구'
 };
 
 const parseKoreanNumber = (text) => {
@@ -51,6 +56,7 @@ export default function Practice() {
     const [maxCombo, setMaxCombo] = useState(0);
     const [gameOver, setGameOver] = useState(false);
     const [volume, setVolume] = useState(0);
+    const [lives, setLives] = useState(3);
 
     const wrongProblemsRef = useRef([]);
     const timerRef = useRef(null);
@@ -71,6 +77,7 @@ export default function Practice() {
     const mode = state?.mode || 'random';
     const selectedDans = state?.dans || [2, 3, 4, 5, 6, 7, 8, 9];
     const voiceEnabled = settings?.voiceEnabled && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+    const maxTime = mode === 'exam' ? 7 : 10;
 
     // Audio Analyzer Setup
     const startVolumeMeter = async () => {
@@ -149,13 +156,24 @@ export default function Practice() {
                     setStats(prev => ({ ...prev, wrong: prev.wrong + 1 }));
                     setCombo(0);
                     wrongProblemsRef.current.push(currentProblem);
+
+                    if (mode === 'exam') {
+                        setLives(prev => {
+                            if (prev <= 1) {
+                                setTimeout(() => setGameOver(true), 1500);
+                                return 0;
+                            }
+                            return prev - 1;
+                        });
+                    }
+
                     setTimeout(() => nextProblem(), 2000);
                     return 'wrong';
                 }
             });
             return false;
         });
-    }, [updateStats, inputValue]);
+    }, [updateStats, inputValue, mode]);
 
     // Used for maxCombo because it's hard to update in setCombo functional update
     const maxComboRef = useRef(0);
@@ -175,7 +193,7 @@ export default function Practice() {
 
     const startTimer = useCallback(() => {
         if (timerRef.current) clearInterval(timerRef.current);
-        setTimeLeft(10);
+        setTimeLeft(maxTime);
         timerRef.current = setInterval(() => {
             setTimeLeft(prev => {
                 if (prev <= 0.1) {
@@ -186,7 +204,7 @@ export default function Practice() {
                 return prev - 0.1;
             });
         }, 100);
-    }, [handleAnswer]);
+    }, [handleAnswer, maxTime]);
 
     const speakProblem = useCallback((a, b) => {
         if (!voiceEnabled) return;
@@ -194,9 +212,17 @@ export default function Practice() {
         window.speechSynthesis.cancel();
 
         const msg = new SpeechSynthesisUtterance();
-        msg.text = `${a} 곱하기 ${b}는?`;
+        // Use natural Gugudan style (e.g., "구이는?" or "육칠은?")
+        const textA = KOREAN_NAMES[a] || a;
+        const textB = KOREAN_NAMES[b] || b;
+
+        // Handle 은/는 based on batchim
+        const hasBatchim = [1, 3, 6, 7, 8].includes(Number(b));
+        const suffix = hasBatchim ? '은' : '는';
+
+        msg.text = `${textA}${textB}${suffix}?`;
         msg.lang = 'ko-KR';
-        msg.rate = 1.0;
+        msg.rate = 1.1;
         msg.volume = 1.0;
 
         setTimeout(() => {
@@ -229,6 +255,10 @@ export default function Practice() {
         }
 
         setProblems(pList);
+
+        if (mode === 'exam') {
+            AudioService.startExamBGM();
+        }
 
         if (voiceEnabled) {
             startVolumeMeter();
@@ -264,6 +294,7 @@ export default function Practice() {
 
         return () => {
             activeRef.current = false;
+            AudioService.stopBGM();
             if (timerRef.current) clearInterval(timerRef.current);
             if (recognitionRef.current) {
                 recognitionRef.current.onend = null;
@@ -278,6 +309,10 @@ export default function Practice() {
 
     // 문제 읽기 및 타이머 - currentIndex 또는 feedback이 바뀔 때 (feedback이 null이 될 때만)
     useEffect(() => {
+        if (gameOver) {
+            AudioService.stopBGM();
+            return;
+        }
         if (problems.length > 0 && currentIndex < problems.length && !gameOver && !feedback) {
             speakProblem(problems[currentIndex].a, problems[currentIndex].b);
             startTimer();
@@ -322,19 +357,37 @@ export default function Practice() {
     const currentProblem = problems[currentIndex];
 
     return (
-        <div className="card animate-pop" style={{
+        <div className={`card animate-pop ${mode === 'exam' ? 'exam-mode' : ''}`} style={{
             maxWidth: '500px', width: '95%', margin: '0.5rem auto', padding: '1rem',
-            display: 'flex', flexDirection: 'column', gap: '0.4rem', position: 'relative'
+            display: 'flex', flexDirection: 'column', gap: '0.4rem', position: 'relative',
+            background: mode === 'exam' ? 'rgba(41, 46, 73, 0.05)' : 'rgba(255, 255, 255, 0.95)',
+            border: mode === 'exam' ? '2px solid var(--primary)' : '1px solid var(--glass-border)'
         }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ background: '#333', color: '#fff', padding: '2px 10px', borderRadius: '15px', fontSize: '0.8rem' }}>
-                    {currentIndex + 1} / {problems.length}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ background: '#333', color: '#fff', padding: '2px 10px', borderRadius: '15px', fontSize: '0.8rem' }}>
+                        {currentIndex + 1} / {problems.length}
+                    </span>
+                    {mode === 'exam' && (
+                        <div style={{ display: 'flex', gap: '2px' }}>
+                            {[...Array(3)].map((_, i) => (
+                                <span key={i} style={{ fontSize: '1.2rem', opacity: i < lives ? 1 : 0.2, transition: 'opacity 0.3s ease' }}>❤️</span>
+                            ))}
+                        </div>
+                    )}
+                </div>
                 <button onClick={handleQuit} style={{ border: 'none', background: 'transparent', color: '#999' }}><X size={20} /></button>
             </div>
 
-            <div style={{ width: '100%', height: '6px', background: '#eee', borderRadius: '3px', overflow: 'hidden', marginTop: '0.4rem' }}>
-                <div style={{ width: `${(timeLeft / 10) * 100}%`, height: '100%', background: timeLeft < 3 ? '#ff4757' : '#3b82f6', transition: 'width 0.1s linear' }} />
+            <div style={{ width: '100%', height: '8px', background: '#eee', borderRadius: '4px', overflow: 'hidden', marginTop: '0.4rem', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)' }}>
+                <div style={{
+                    width: `${(timeLeft / maxTime) * 100}%`,
+                    height: '100%',
+                    background: timeLeft < 3 ? '#ff4757' : '#3b82f6',
+                    transition: 'width 0.1s linear',
+                    boxShadow: timeLeft < 3 ? '0 0 10px #ff4757' : 'none',
+                    animation: timeLeft < 3 ? 'pulse 0.5s infinite alternate' : 'none'
+                }} />
             </div>
 
             <div style={{ minHeight: '24px', textAlign: 'center', fontSize: '0.9rem' }}>

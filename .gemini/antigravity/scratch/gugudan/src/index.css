@@ -89,6 +89,18 @@ body {
   }
 }
 
+@keyframes pulse {
+  0% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+
+  100% {
+    opacity: 0.7;
+    transform: scaleY(1.2);
+  }
+}
+
 .animate-pop {
   animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
