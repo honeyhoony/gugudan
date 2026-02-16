@@ -74,8 +74,8 @@ export default function Learn() {
                 </button>
             </div>
 
-            {/* List - Grid Layout */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            {/* List - Single Column Layout */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.8rem' }}>
                 {steps.map((step) => {
                     // Determine if answer should be shown
                     // If hideAnswers is true, only show if revealed[step] is true
@@ -87,10 +87,9 @@ export default function Learn() {
                             onClick={() => toggleReveal(step)}
                             style={{
                                 display: 'flex',
-                                flexDirection: 'column',
                                 alignItems: 'center',
-                                justifyContent: 'center',
-                                padding: '1rem',
+                                justifyContent: 'space-between',
+                                padding: '1rem 1.5rem',
                                 background: showAnswer ? '#fff' : '#f8fafc',
                                 color: '#1e293b',
                                 border: '1px solid #e2e8f0',
@@ -100,15 +99,12 @@ export default function Learn() {
                                 boxShadow: showAnswer ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
                             }}
                         >
-                            <span style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '4px', opacity: 0.8 }}>
+                            <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
                                 {danNum} × {step}
                             </span>
-                            <span style={{ fontSize: '1.4rem', fontWeight: 'bold', color: showAnswer ? '#3b82f6' : 'transparent', minHeight: '1.4em' }}>
+                            <span style={{ fontSize: '1.4rem', fontWeight: 'bold', color: showAnswer ? '#3b82f6' : 'transparent', minWidth: '2em', textAlign: 'right' }}>
                                 {showAnswer ? danNum * step : '?'}
                             </span>
-                            {hideAnswers && !showAnswer && (
-                                <span style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '4px' }}>터치해서 정답 보기</span>
-                            )}
                         </div>
                     );
                 })}
