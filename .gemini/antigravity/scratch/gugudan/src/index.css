@@ -273,3 +273,42 @@ section h3 {
     font-size: 1.6rem;
   }
 }
+
+/* Multiple Choice Button Styles */
+.choice-btn {
+  padding: 1.2rem;
+  font-size: 1.8rem;
+  font-weight: 700;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 0 #e2e8f0;
+  border: 2px solid #e2e8f0;
+  color: var(--text);
+  transition: all 0.1s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+  cursor: pointer;
+  outline: none;
+  /* Remove blue focus ring */
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.choice-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #e2e8f0;
+}
+
+/* Only apply hover effects on devices that support hover */
+@media (hover: hover) {
+  .choice-btn:hover:not(:disabled) {
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+}
+
+.choice-btn:disabled {
+  cursor: default;
+}
