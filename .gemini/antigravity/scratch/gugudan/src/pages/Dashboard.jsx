@@ -27,7 +27,7 @@ export default function Dashboard() {
     if (!user) return null;
 
     return (
-        <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem' }}>
+        <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem', paddingTop: '3rem' }}>
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <div>

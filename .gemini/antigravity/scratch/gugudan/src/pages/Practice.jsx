@@ -403,6 +403,14 @@ export default function Practice() {
     const handleStartGame = () => {
         setGameStarted(true);
         AudioService.init();
+
+        // Mobile TTS fix: Trigger an empty utterance to unlock the synth on user gesture
+        if (settings.ttsEnabled) {
+            const dummy = new SpeechSynthesisUtterance('');
+            dummy.volume = 0;
+            window.speechSynthesis.speak(dummy);
+        }
+
         if (voiceEnabled) {
             startVolumeMeter();
         }

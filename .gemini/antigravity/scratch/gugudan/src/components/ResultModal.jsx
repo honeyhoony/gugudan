@@ -61,8 +61,17 @@ export default function ResultModal({ stats, maxCombo, wrongProblems = [], onHom
     const evalResult = getEvaluation(score);
 
     return (
-        <div className="modal-overlay">
-            <div className="modal-content animate-pop" style={{ textAlign: 'center', maxWidth: '400px', width: '90%' }}>
+        <div className="modal-overlay" style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.6)', zIndex: 9999,
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+            <div className="modal-content animate-pop" style={{
+                textAlign: 'center', maxWidth: '400px', width: '90%',
+                background: 'white', padding: '2rem', borderRadius: '24px',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                margin: 'auto'
+            }}>
                 <h1 style={{ fontSize: '2.5rem', margin: '0 0 0.5rem', color: evalResult.color }}>{score >= 90 ? '🏆 대단해요!' : '🎮 경기 종료!'}</h1>
                 <p style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '1.5rem', color: evalResult.color }}>
                     {evalResult.text}
