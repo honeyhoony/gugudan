@@ -42,7 +42,7 @@ export default function Dashboard() {
             {/* 1. 학습 */}
             <section style={{ marginBottom: '2.5rem' }}>
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
-                    <BookOpen size={24} color="var(--primary)" /> 1. 구구단 학습
+                    <BookOpen size={24} color="var(--primary)" /> 1. 구구단 듣기 & 학습
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
                     {[2, 3, 4, 5, 6, 7, 8, 9].map(num => (
