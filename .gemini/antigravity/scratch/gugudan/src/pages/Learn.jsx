@@ -132,7 +132,7 @@ export default function Learn() {
     const displaySteps = direction === 'asc' ? [1, 2, 3, 4, 5, 6, 7, 8, 9] : [9, 8, 7, 6, 5, 4, 3, 2, 1];
 
     return (
-        <div className="card animate-pop" style={{ maxWidth: '600px', margin: '1rem auto', padding: '1.5rem', minHeight: '80vh' }}>
+        <div className="card animate-pop" style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem', minHeight: '100vh', background: '#fff', borderRadius: 0 }}>
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
                 <button
@@ -177,9 +177,7 @@ export default function Learn() {
             <div style={{
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '0.8rem',
-                maxHeight: '60vh',
-                overflowY: 'auto',
+                gap: '0.4rem',
                 paddingRight: '5px'
             }}>
                 {displaySteps.map((step) => {
@@ -191,15 +189,15 @@ export default function Learn() {
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
-                                padding: '1.2rem 1.5rem',
-                                borderRadius: '16px',
-                                background: isActive ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+                                padding: '1rem 1.2rem',
+                                borderRadius: '12px',
+                                background: isActive ? 'var(--primary)' : '#f8fafc',
                                 color: isActive ? 'white' : 'var(--text)',
                                 transform: isActive ? 'scale(1.02)' : 'scale(1)',
                                 transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                                border: isActive ? 'none' : '1px solid rgba(0,0,0,0.05)',
+                                border: isActive ? 'none' : '1px solid #e2e8f0',
                                 boxShadow: isActive ? '0 10px 25px -5px rgba(59, 130, 246, 0.4)' : 'none',
-                                opacity: isPlaying && !isActive ? 0.4 : 1
+                                opacity: isPlaying && !isActive ? 0.3 : 1
                             }}
                         >
                             <span style={{ fontSize: '1.5rem', fontWeight: 'bold', fontFamily: 'monospace' }}>

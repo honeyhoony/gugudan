@@ -34,15 +34,12 @@ export default function Dashboard() {
                     <h1 style={{ fontSize: '1.2rem', margin: 0 }}>안녕하세요, {user.name} 👋</h1>
                     <p style={{ fontSize: '0.9rem', opacity: 0.7, margin: 0 }}>오늘도 즐겁게 구구단을 배워봐요!</p>
                 </div>
-                <div style={{ background: 'var(--primary)', color: 'white', padding: '0.5rem 1rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                    Lv.{Math.floor((user.stats?.totalCorrect || 0) / 50) + 1}
-                </div>
             </div>
 
             {/* 1. 학습 */}
             <section style={{ marginBottom: '2.5rem' }}>
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
-                    <BookOpen size={24} color="var(--primary)" /> 1. 구구단 듣기 & 학습
+                    <BookOpen size={24} color="var(--primary)" /> 1. 구구단 학습
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
                     {[2, 3, 4, 5, 6, 7, 8, 9].map(num => (
