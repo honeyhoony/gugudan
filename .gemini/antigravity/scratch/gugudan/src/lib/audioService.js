@@ -3,6 +3,7 @@ export class AudioService {
     static isPlaying = false;
     static lastTime = 0;
     static timerId = null;
+    static intensity = 0; // 0: normal, 1: very urgent
 
     static init() {
         if (!this.audioCtx) {
@@ -13,12 +14,12 @@ export class AudioService {
         }
     }
 
-    static playKick(time) {
+    static playKick(time, vol = 1) {
         const osc = this.audioCtx.createOscillator();
         const env = this.audioCtx.createGain();
         osc.frequency.setValueAtTime(150, time);
         osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.15);
-        env.gain.setValueAtTime(1, time);
+        env.gain.setValueAtTime(vol, time);
         env.gain.exponentialRampToValueAtTime(0.01, time + 0.15);
         osc.connect(env);
         env.connect(this.audioCtx.destination);
@@ -26,20 +27,18 @@ export class AudioService {
         osc.stop(time + 0.15);
     }
 
-    static playHiHat(time) {
+    static playHiHat(time, vol = 0.3) {
         const bufferSize = this.audioCtx.sampleRate * 0.05;
         const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
         const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-            data[i] = Math.random() * 2 - 1;
-        }
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
         const source = this.audioCtx.createBufferSource();
         source.buffer = buffer;
         const filter = this.audioCtx.createBiquadFilter();
         filter.type = 'highpass';
         filter.frequency.value = 7000;
         const env = this.audioCtx.createGain();
-        env.gain.setValueAtTime(0.3, time);
+        env.gain.setValueAtTime(vol, time);
         env.gain.exponentialRampToValueAtTime(0.01, time + 0.05);
         source.connect(filter);
         filter.connect(env);
@@ -48,12 +47,12 @@ export class AudioService {
         source.stop(time + 0.05);
     }
 
-    static playBass(time, freq) {
+    static playBass(time, freq, vol = 0.2) {
         const osc = this.audioCtx.createOscillator();
         const env = this.audioCtx.createGain();
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(freq, time);
-        env.gain.setValueAtTime(0.2, time);
+        env.gain.setValueAtTime(vol, time);
         env.gain.exponentialRampToValueAtTime(0.01, time + 0.2);
         const filter = this.audioCtx.createBiquadFilter();
         filter.type = 'lowpass';
@@ -65,24 +64,33 @@ export class AudioService {
         osc.stop(time + 0.2);
     }
 
+    static updateIntensity(val) {
+        this.intensity = Math.max(0, Math.min(1, val));
+    }
+
     static startExamBGM() {
         this.init();
         if (this.isPlaying) return;
         this.isPlaying = true;
+        this.intensity = 0;
 
-        const bpm = 145;
-        const stepTime = 60 / bpm / 4;
         let step = 0;
-
         const scheduler = () => {
-            while (this.lastTime < this.audioCtx.currentTime + 0.1) {
-                if (step % 4 === 0) this.playKick(this.lastTime);
-                if (step % 2 === 1) this.playHiHat(this.lastTime);
+            if (!this.isPlaying) return;
 
-                // Bassline pattern
+            // BPM and Volume increase with intensity
+            const baseBpm = 145;
+            const bpm = baseBpm + (this.intensity * 35); // Max 180 BPM
+            const stepTime = 60 / bpm / 4;
+            const globalVol = 0.8 + (this.intensity * 0.4); // Get slightly louder
+
+            while (this.lastTime < this.audioCtx.currentTime + 0.1) {
+                if (step % 4 === 0) this.playKick(this.lastTime, 1.0 * globalVol);
+                if (step % 2 === 1) this.playHiHat(this.lastTime, 0.3 * globalVol);
+
                 const bassPattern = [55, 0, 55, 48, 55, 0, 60, 48];
                 const freq = bassPattern[step % 8];
-                if (freq > 0) this.playBass(this.lastTime, freq);
+                if (freq > 0) this.playBass(this.lastTime, freq, 0.2 * globalVol);
 
                 this.lastTime += stepTime;
                 step++;
@@ -96,39 +104,47 @@ export class AudioService {
 
     static stopBGM() {
         this.isPlaying = false;
+        this.intensity = 0;
         if (this.timerId) clearTimeout(this.timerId);
+    }
+
+    static playSimpleDing() {
+        this.init();
+        const t = this.audioCtx.currentTime;
+        const osc = this.audioCtx.createOscillator();
+        const env = this.audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, t);
+        osc.frequency.exponentialRampToValueAtTime(1320, t + 0.1);
+        env.gain.setValueAtTime(0.3, t);
+        env.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+        osc.connect(env);
+        env.connect(this.audioCtx.destination);
+        osc.start(t);
+        osc.stop(t + 0.3);
     }
 
     static playCorrectSound() {
         this.init();
         const t = this.audioCtx.currentTime;
-
-        // Stadium-like cheering (White noise with resonant filtering)
         const bufferSize = this.audioCtx.sampleRate * 1.5;
         const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-
         const noise = this.audioCtx.createBufferSource();
         noise.buffer = buffer;
-
         const filter = this.audioCtx.createBiquadFilter();
         filter.type = 'bandpass';
         filter.frequency.setValueAtTime(1000, t);
         filter.Q.value = 1;
-
         const env = this.audioCtx.createGain();
         env.gain.setValueAtTime(0, t);
         env.gain.linearRampToValueAtTime(0.3, t + 0.1);
         env.gain.exponentialRampToValueAtTime(0.01, t + 1.2);
-
         noise.connect(filter);
         filter.connect(env);
         env.connect(this.audioCtx.destination);
         noise.start(t);
-        noise.stop(t + 1.5);
-
-        // Add a high-pitched "woo!" whistle
         const osc = this.audioCtx.createOscillator();
         const oscEnv = this.audioCtx.createGain();
         osc.type = 'sine';
@@ -145,26 +161,20 @@ export class AudioService {
     static playWrongSound() {
         this.init();
         const t = this.audioCtx.currentTime;
-
-        // Disappointed crowd "Aww" (Low pass noise)
         const bufferSize = this.audioCtx.sampleRate * 1.0;
         const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-
         const noise = this.audioCtx.createBufferSource();
         noise.buffer = buffer;
-
         const filter = this.audioCtx.createBiquadFilter();
         filter.type = 'lowpass';
         filter.frequency.setValueAtTime(800, t);
         filter.frequency.exponentialRampToValueAtTime(200, t + 0.8);
-
         const env = this.audioCtx.createGain();
         env.gain.setValueAtTime(0, t);
         env.gain.linearRampToValueAtTime(0.2, t + 0.1);
         env.gain.exponentialRampToValueAtTime(0.01, t + 0.9);
-
         noise.connect(filter);
         filter.connect(env);
         env.connect(this.audioCtx.destination);
@@ -175,13 +185,7 @@ export class AudioService {
     static playPerfectSound() {
         this.init();
         const t = this.audioCtx.currentTime;
-        // Epic fanfare
-        const chords = [
-            [523.25, 659.25, 783.99], // C
-            [659.25, 830.61, 987.77], // E
-            [783.99, 987.77, 1174.66] // G
-        ];
-
+        const chords = [[523.25, 659.25, 783.99], [659.25, 830.61, 987.77], [783.99, 987.77, 1174.66]];
         chords.forEach((chord, i) => {
             chord.forEach(f => {
                 const osc = this.audioCtx.createOscillator();
@@ -197,8 +201,6 @@ export class AudioService {
                 osc.stop(t + i * 0.3 + 0.5);
             });
         });
-
-        // Massive Cheer
         setTimeout(() => this.playCorrectSound(), 500);
     }
 }

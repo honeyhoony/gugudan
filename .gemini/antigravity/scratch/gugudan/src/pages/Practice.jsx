@@ -150,14 +150,19 @@ export default function Practice() {
                         if (nc > maxComboRef.current) maxComboRef.current = nc;
                         return nc;
                     });
-                    if (settings.sfxEnabled) AudioService.playCorrectSound();
+                    if (settings.sfxEnabled) {
+                        if (mode === 'exam') AudioService.playCorrectSound();
+                        else AudioService.playSimpleDing();
+                    }
                     confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
-                    setTimeout(() => nextProblem(), 1200); // Slightly longer for the cheer sound
+                    setTimeout(() => nextProblem(), mode === 'exam' ? 1200 : 600);
                     return 'correct';
                 } else {
                     setStats(prev => ({ ...prev, wrong: prev.wrong + 1 }));
                     setCombo(0);
-                    if (settings.sfxEnabled) AudioService.playWrongSound();
+                    if (settings.sfxEnabled) {
+                        if (mode === 'exam') AudioService.playWrongSound();
+                    }
                     wrongProblemsRef.current.push(currentProblem);
 
                     if (mode === 'exam') {
@@ -202,6 +207,7 @@ export default function Practice() {
     const startTimer = useCallback(() => {
         if (timerRef.current) clearInterval(timerRef.current);
         setTimeLeft(maxTime);
+        if (settings.sfxEnabled) AudioService.updateIntensity(0);
         timerRef.current = setInterval(() => {
             setTimeLeft(prev => {
                 if (prev <= 0.1) {
@@ -209,7 +215,13 @@ export default function Practice() {
                     handleAnswer(null, true);
                     return 0;
                 }
-                return prev - 0.1;
+                const nextTime = prev - 0.1;
+                // Update BGM intensity based on time left (last 6 seconds)
+                if (mode === 'exam' && settings.sfxEnabled) {
+                    const urgency = nextTime < 6 ? (6 - nextTime) / 6 : 0;
+                    AudioService.updateIntensity(urgency);
+                }
+                return nextTime;
             });
         }, 100);
     }, [handleAnswer, maxTime]);
@@ -264,12 +276,7 @@ export default function Practice() {
 
         setProblems(pList);
 
-        if (mode === 'exam' && settings.sfxEnabled) {
-            AudioService.startExamBGM();
-        }
-
         if (voiceEnabled) {
-            startVolumeMeter();
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognitionRef.current = new SpeechRecognition();
             recognitionRef.current.lang = 'ko-KR';
