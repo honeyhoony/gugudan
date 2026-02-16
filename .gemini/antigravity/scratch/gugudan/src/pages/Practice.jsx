@@ -152,11 +152,12 @@ export default function Practice() {
                     });
                     AudioService.playCorrectSound();
                     confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
-                    setTimeout(() => nextProblem(), 800);
+                    setTimeout(() => nextProblem(), 1200); // Slightly longer for the cheer sound
                     return 'correct';
                 } else {
                     setStats(prev => ({ ...prev, wrong: prev.wrong + 1 }));
                     setCombo(0);
+                    AudioService.playWrongSound();
                     wrongProblemsRef.current.push(currentProblem);
 
                     if (mode === 'exam') {

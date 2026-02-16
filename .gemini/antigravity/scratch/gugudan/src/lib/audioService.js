@@ -102,54 +102,103 @@ export class AudioService {
     static playCorrectSound() {
         this.init();
         const t = this.audioCtx.currentTime;
-        // Bright "Ding" or "Clap" like sound
-        const osc = this.audioCtx.createOscillator();
-        const env = this.audioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, t);
-        osc.frequency.exponentialRampToValueAtTime(1320, t + 0.1);
-        env.gain.setValueAtTime(0.3, t);
-        env.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
-        osc.connect(env);
-        env.connect(this.audioCtx.destination);
-        osc.start(t);
-        osc.stop(t + 0.5);
 
-        // Add a bit of noise for a clap feel
-        const bufferSize = this.audioCtx.sampleRate * 0.1;
+        // Stadium-like cheering (White noise with resonant filtering)
+        const bufferSize = this.audioCtx.sampleRate * 1.5;
         const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
         const noise = this.audioCtx.createBufferSource();
         noise.buffer = buffer;
+
         const filter = this.audioCtx.createBiquadFilter();
-        const nEnv = this.audioCtx.createGain();
-        filter.type = 'highpass';
-        filter.frequency.value = 1000;
-        nEnv.gain.setValueAtTime(0.2, t);
-        nEnv.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1000, t);
+        filter.Q.value = 1;
+
+        const env = this.audioCtx.createGain();
+        env.gain.setValueAtTime(0, t);
+        env.gain.linearRampToValueAtTime(0.3, t + 0.1);
+        env.gain.exponentialRampToValueAtTime(0.01, t + 1.2);
+
         noise.connect(filter);
-        filter.connect(nEnv);
-        nEnv.connect(this.audioCtx.destination);
+        filter.connect(env);
+        env.connect(this.audioCtx.destination);
         noise.start(t);
+        noise.stop(t + 1.5);
+
+        // Add a high-pitched "woo!" whistle
+        const osc = this.audioCtx.createOscillator();
+        const oscEnv = this.audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1200, t);
+        osc.frequency.exponentialRampToValueAtTime(1800, t + 0.1);
+        oscEnv.gain.setValueAtTime(0.1, t);
+        oscEnv.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+        osc.connect(oscEnv);
+        oscEnv.connect(this.audioCtx.destination);
+        osc.start(t);
+        osc.stop(t + 0.5);
+    }
+
+    static playWrongSound() {
+        this.init();
+        const t = this.audioCtx.currentTime;
+
+        // Disappointed crowd "Aww" (Low pass noise)
+        const bufferSize = this.audioCtx.sampleRate * 1.0;
+        const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+        const noise = this.audioCtx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = this.audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(800, t);
+        filter.frequency.exponentialRampToValueAtTime(200, t + 0.8);
+
+        const env = this.audioCtx.createGain();
+        env.gain.setValueAtTime(0, t);
+        env.gain.linearRampToValueAtTime(0.2, t + 0.1);
+        env.gain.exponentialRampToValueAtTime(0.01, t + 0.9);
+
+        noise.connect(filter);
+        filter.connect(env);
+        env.connect(this.audioCtx.destination);
+        noise.start(t);
+        noise.stop(t + 1.0);
     }
 
     static playPerfectSound() {
         this.init();
         const t = this.audioCtx.currentTime;
-        // celebratory "Ta-da!" Chord
-        const freqs = [523.25, 659.25, 783.99, 1046.50]; // C Major
-        freqs.forEach((f, i) => {
-            const osc = this.audioCtx.createOscillator();
-            const env = this.audioCtx.createGain();
-            osc.frequency.setValueAtTime(f, t + i * 0.05);
-            env.gain.setValueAtTime(0, t);
-            env.gain.linearRampToValueAtTime(0.1, t + i * 0.05 + 0.02);
-            env.gain.exponentialRampToValueAtTime(0.01, t + 1.5);
-            osc.connect(env);
-            env.connect(this.audioCtx.destination);
-            osc.start(t + i * 0.05);
-            osc.stop(t + 1.5);
+        // Epic fanfare
+        const chords = [
+            [523.25, 659.25, 783.99], // C
+            [659.25, 830.61, 987.77], // E
+            [783.99, 987.77, 1174.66] // G
+        ];
+
+        chords.forEach((chord, i) => {
+            chord.forEach(f => {
+                const osc = this.audioCtx.createOscillator();
+                const env = this.audioCtx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(f, t + i * 0.3);
+                env.gain.setValueAtTime(0, t + i * 0.3);
+                env.gain.linearRampToValueAtTime(0.1, t + i * 0.3 + 0.05);
+                env.gain.exponentialRampToValueAtTime(0.01, t + i * 0.3 + 0.4);
+                osc.connect(env);
+                env.connect(this.audioCtx.destination);
+                osc.start(t + i * 0.3);
+                osc.stop(t + i * 0.3 + 0.5);
+            });
         });
+
+        // Massive Cheer
+        setTimeout(() => this.playCorrectSound(), 500);
     }
 }
