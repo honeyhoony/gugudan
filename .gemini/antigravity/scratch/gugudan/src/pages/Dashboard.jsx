@@ -46,7 +46,7 @@ export default function Dashboard() {
                         <button
                             key={num}
                             className="btn btn-outline"
-                            style={{ fontSize: '1.1rem', padding: '0.8rem 0' }}
+                            style={{ fontSize: '1.1rem', padding: '0.8rem 0', touchAction: 'manipulation' }}
                             onClick={() => navigate(`/learn/${num}`)}
                         >
                             {num}단
@@ -135,7 +135,7 @@ export default function Dashboard() {
                             <button
                                 key={num}
                                 className={`btn ${examDans.includes(num) ? 'btn-secondary' : 'btn-outline'}`}
-                                style={{ fontSize: '1rem', padding: '0.6rem', margin: 0, opacity: examDans.includes(num) ? 1 : 0.4 }}
+                                style={{ fontSize: '1rem', padding: '0.6rem', margin: 0, opacity: examDans.includes(num) ? 1 : 0.4, touchAction: 'manipulation' }}
                                 onClick={() => toggleExamDan(num)}
                             >
                                 {num}단
