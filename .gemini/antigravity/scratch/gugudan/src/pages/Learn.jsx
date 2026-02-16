@@ -57,6 +57,22 @@ export default function Learn() {
 
     const processingRef = useRef(false);
 
+    // Cleanup on unmount AND ensure voices are loaded
+    useEffect(() => {
+        const loadVoices = () => {
+            const voices = window.speechSynthesis.getVoices();
+            console.log("Voices loaded:", voices.length);
+        };
+        loadVoices();
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+
+        return () => {
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.onvoiceschanged = null;
+            isPlayingRef.current = false;
+        };
+    }, []);
+
     const playSequence = (stepIndex) => {
         if (!isPlayingRef.current) return;
 
@@ -75,27 +91,37 @@ export default function Learn() {
 
         const result = danNum * step;
 
-        // Construct: "2 1 is 2" -> "Yi Il-eun Yi"
         const txtDan = KOREAN_DIGITS[danNum];
         const txtStep = KOREAN_DIGITS[step];
         const txtResult = getKoreanNumber(result);
-
         const suffix = getBatchimSuffix(txtStep);
 
-        const utterance = new SpeechSynthesisUtterance();
-        utterance.text = `${txtDan} ${txtStep}${suffix}, ${txtResult}`;
+        const text = `${txtDan} ${txtStep}${suffix}, ${txtResult}`;
+        const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'ko-KR';
-        utterance.rate = 0.85; // Natural speaking pace
+        utterance.rate = 0.9;
+
+        // Try to find a Korean voice
+        const voices = window.speechSynthesis.getVoices();
+        const korVoice = voices.find(v => v.lang.includes('ko'));
+        if (korVoice) utterance.voice = korVoice;
 
         utterance.onend = () => {
             if (isPlayingRef.current) {
                 setTimeout(() => {
                     playSequence(stepIndex + 1);
-                }, 400); // Pause between lines
+                }, 400);
             }
         };
 
-        window.speechSynthesis.cancel(); // Clear any previous
+        utterance.onerror = (e) => {
+            console.error("Speech error", e);
+            if (isPlayingRef.current) {
+                setTimeout(() => playSequence(stepIndex + 1), 500);
+            }
+        };
+
+        window.speechSynthesis.cancel();
         window.speechSynthesis.speak(utterance);
     };
 
@@ -117,13 +143,6 @@ export default function Learn() {
         setDirection(prev => prev === 'asc' ? 'desc' : 'asc');
     };
 
-    // Cleanup on unmount
-    useEffect(() => {
-        return () => {
-            window.speechSynthesis.cancel();
-            isPlayingRef.current = false;
-        };
-    }, []);
 
     if (isNaN(danNum) || danNum < 2 || danNum > 9) {
         return <div style={{ padding: '2rem' }}>잘못된 접근입니다.</div>;
@@ -177,8 +196,10 @@ export default function Learn() {
             <div style={{
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '0.4rem',
-                paddingRight: '5px'
+                gap: '0',
+                border: '1px solid #e2e8f0',
+                borderRadius: '16px',
+                overflow: 'hidden'
             }}>
                 {displaySteps.map((step) => {
                     const isActive = step === highlightedStep;
@@ -189,21 +210,19 @@ export default function Learn() {
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
-                                padding: '1rem 1.2rem',
+                                padding: '0.8rem 1rem',
                                 borderRadius: '12px',
-                                background: isActive ? 'var(--primary)' : '#f8fafc',
-                                color: isActive ? 'white' : 'var(--text)',
-                                transform: isActive ? 'scale(1.02)' : 'scale(1)',
-                                transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                                border: isActive ? 'none' : '1px solid #e2e8f0',
-                                boxShadow: isActive ? '0 10px 25px -5px rgba(59, 130, 246, 0.4)' : 'none',
+                                background: isActive ? '#3b82f6' : 'white',
+                                color: isActive ? 'white' : '#1e293b',
+                                borderBottom: '1px solid #f1f5f9',
+                                transition: 'all 0.2s ease',
                                 opacity: isPlaying && !isActive ? 0.3 : 1
                             }}
                         >
-                            <span style={{ fontSize: '1.5rem', fontWeight: 'bold', fontFamily: 'monospace' }}>
+                            <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
                                 {danNum} × {step}
                             </span>
-                            <span style={{ fontSize: '1.8rem', fontWeight: 'bold', color: isActive ? '#fff' : 'var(--primary)' }}>
+                            <span style={{ fontSize: '1.4rem', fontWeight: 'bold', color: isActive ? 'white' : '#3b82f6' }}>
                                 {danNum * step}
                             </span>
                         </div>
