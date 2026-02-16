@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function MultipleChoice({ options, onSelect, disabled }) {
+export default function MultipleChoice({ options, onSelect, disabled, selectedAnswer, correctAnswer }) {
     return (
         <div style={{
             display: 'grid',
@@ -22,15 +22,17 @@ export default function MultipleChoice({ options, onSelect, disabled }) {
                         fontWeight: 'bold',
                         background: 'white',
                         borderRadius: '16px',
-                        boxShadow: '0 4px 0 #e2e8f0',
-                        border: '2px solid #e2e8f0',
-                        color: 'var(--text)',
+                        boxShadow: opt === selectedAnswer ? 'inset 0 2px 4px rgba(0,0,0,0.1)' : '0 4px 0 #e2e8f0',
+                        border: correctAnswer === opt ? '2px solid #22c55e' : (selectedAnswer === opt && selectedAnswer !== correctAnswer && correctAnswer) ? '2px solid #ef4444' : '2px solid #e2e8f0',
+                        background: correctAnswer === opt ? '#dcfce7' : (selectedAnswer === opt && selectedAnswer !== correctAnswer && correctAnswer) ? '#fee2e2' : 'white',
+                        color: correctAnswer === opt ? '#15803d' : (selectedAnswer === opt && selectedAnswer !== correctAnswer && correctAnswer) ? '#b91c1c' : 'var(--text)',
+                        transform: (disabled && opt === selectedAnswer) ? 'translateY(2px)' : 'none',
                         transition: 'all 0.1s ease',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         minHeight: '80px',
-                        opacity: disabled ? 0.7 : 1,
+                        opacity: disabled ? (opt === selectedAnswer || opt === correctAnswer ? 1 : 0.5) : 1,
                         cursor: disabled ? 'default' : 'pointer'
                     }}
                     onMouseEnter={(e) => {

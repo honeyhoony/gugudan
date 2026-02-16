@@ -414,8 +414,20 @@ export default function Practice() {
         if (voiceEnabled) {
             startVolumeMeter();
         }
-        if (mode === 'exam' && settings.sfxEnabled) {
-            AudioService.startExamBGM();
+
+        // Play BGM if SFX enabled, regardless of mode (or specific modes)
+        // User requested "exciting song" in "Real problem" (Exam). 
+        // Existing code had: if (mode === 'exam') ...
+        // Ensure it runs.
+        if (settings.sfxEnabled) {
+            // Use exam BGM for exam mode, maybe a lighter one for others? 
+            // For now, let's enable it for Exam as requested.
+            // If it wasn't playing, maybe Init failed?
+            // Let's try adding a small delay or ensuring intensity is set.
+            if (mode === 'exam') {
+                AudioService.startExamBGM();
+                AudioService.updateIntensity(0.5); // Start with medium intensity
+            }
         }
     };
 
@@ -522,12 +534,16 @@ export default function Practice() {
 
             {settings.inputMethod === 'choice' ? (
                 <MultipleChoice
+                    key={currentIndex} // Force re-render to reset button states
                     options={options}
                     onSelect={(val) => {
+                        if (feedback || gameOver) return; // Prevent multiple clicks
                         setInputValue(String(val));
                         handleAnswer(val);
                     }}
                     disabled={!!feedback || gameOver}
+                    selectedAnswer={feedback ? parseInt(inputValue) : null}
+                    correctAnswer={feedback ? currentProblem.a * currentProblem.b : null}
                 />
             ) : (
                 !feedback && (
