@@ -277,7 +277,7 @@ export default function Practice() {
             recognitionRef.current.interimResults = true;
 
             recognitionRef.current.onresult = (event) => {
-                const { feedback, gameOver } = latest.current;
+                const { currentIndex, problems, feedback, gameOver } = latest.current;
                 if (feedback || gameOver) return;
 
                 const results = event.results[event.results.length - 1];
@@ -293,7 +293,14 @@ export default function Practice() {
 
                 if (number !== null) {
                     setInputValue(String(number));
-                    if (results.isFinal) {
+
+                    // Auto-submit if the number matches the correct answer (very responsive for single digits)
+                    const currentProblem = problems[currentIndex];
+                    const answer = currentProblem.a * currentProblem.b;
+
+                    if (number === answer) {
+                        handleAnswerRef.current(number);
+                    } else if (results.isFinal) {
                         handleAnswerRef.current(number);
                     }
                 }
