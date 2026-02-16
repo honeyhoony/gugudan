@@ -227,12 +227,20 @@ export default function Learn() {
             }
             if (feedback === 'correct' && currentStep < 9) {
                 // Auto start next?
-                setTimeout(() => startListening(), 1200);
+                // Wait a bit for the effect to finish, then restart mic for next step
+                setTimeout(() => {
+                    startListening();
+                }, 1500);
             }
         };
 
         recognitionRef.current = recognition;
-        recognition.start();
+        try {
+            recognition.start();
+        } catch (e) {
+            console.error("Recognition start error", e);
+            // If already started, ignore
+        }
     };
 
     const stopListening = () => {
@@ -442,7 +450,7 @@ export default function Learn() {
                                     {isCurrent && <Mic size={24} className="animate-pulse" color="#3b82f6" />}
                                     {!isDone && !isCurrent && <div style={{ width: '24px' }}></div>}
                                     <span style={{ fontSize: '1.4rem', fontWeight: 'bold', color: isDone ? '#22c55e' : isCurrent ? '#3b82f6' : '#94a3b8' }}>
-                                        {isDone || isCurrent ? danNum * step : '?'}
+                                        {isDone ? danNum * step : '?'}
                                     </span>
                                 </div>
                             );
