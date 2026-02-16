@@ -151,7 +151,7 @@ export default function Learn() {
     const displaySteps = direction === 'asc' ? [1, 2, 3, 4, 5, 6, 7, 8, 9] : [9, 8, 7, 6, 5, 4, 3, 2, 1];
 
     return (
-        <div className="card animate-pop" style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem', minHeight: '100vh', background: '#fff', borderRadius: 0 }}>
+        <div className="card animate-pop" style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem', paddingTop: '3rem', minHeight: '100vh', background: '#fff', borderRadius: 0 }}>
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
                 <button
@@ -210,8 +210,8 @@ export default function Learn() {
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
-                                padding: '0.8rem 1rem',
-                                borderRadius: '12px',
+                                padding: '0.6rem 1rem',
+                                borderRadius: '8px',
                                 background: isActive ? '#3b82f6' : 'white',
                                 color: isActive ? 'white' : '#1e293b',
                                 borderBottom: '1px solid #f1f5f9',
