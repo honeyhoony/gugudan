@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { GameLogic } from '../lib/gameLogic';
 import { useUser } from '../context/UserContext';
@@ -59,7 +59,7 @@ export default function Practice() {
     const [volume, setVolume] = useState(0);
     const [lives, setLives] = useState(5);
     const [gameStarted, setGameStarted] = useState(false);
-    const [options, setOptions] = useState([]);
+    // const [options, setOptions] = useState([]); // Removed state for options
 
     const wrongProblemsRef = useRef([]);
     const timerRef = useRef(null);
@@ -203,8 +203,10 @@ export default function Practice() {
     // Used for maxCombo because it's hard to update in setCombo functional update
     const maxComboRef = useRef(0);
 
-    const generateOptions = useCallback((currentProblem) => {
-        if (!currentProblem) return;
+    // Removed useCallback generateOptions and useEffect.
+    // Replaced with useMemo for synchronous update.
+    const options = React.useMemo(() => {
+        if (!currentProblem) return [];
         const answer = currentProblem.a * currentProblem.b;
         const choices = new Set();
         choices.add(answer);
@@ -232,8 +234,8 @@ export default function Practice() {
         while (choices.size < 4) {
             choices.add((Math.floor(Math.random() * 8) + 2) * (Math.floor(Math.random() * 8) + 2));
         }
-        setOptions(Array.from(choices).sort(() => Math.random() - 0.5));
-    }, []);
+        return Array.from(choices).sort(() => Math.random() - 0.5);
+    }, [currentProblem]); // Re-calculates immediately when currentProblem changes
 
     const nextProblem = useCallback(() => {
         if (!activeRef.current) return;
@@ -391,10 +393,9 @@ export default function Practice() {
             if (settings.sfxEnabled) AudioService.stopBGM();
             return;
         }
+
         if (problems.length > 0 && currentIndex < problems.length && !gameOver && !feedback) {
-            if (settings.inputMethod === 'choice') {
-                generateOptions(problems[currentIndex]);
-            }
+            // Options are now handled by useMemo
             speakProblem(problems[currentIndex].a, problems[currentIndex].b);
             startTimer();
         }
