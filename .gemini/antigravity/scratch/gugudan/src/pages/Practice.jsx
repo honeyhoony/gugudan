@@ -61,6 +61,9 @@ export default function Practice() {
     const [gameStarted, setGameStarted] = useState(false);
     // const [options, setOptions] = useState([]); // Removed state for options
 
+    // Define currentProblem early so useMemo can use it
+    const currentProblem = problems[currentIndex];
+
     const wrongProblemsRef = useRef([]);
     const timerRef = useRef(null);
     const [timeLeft, setTimeLeft] = useState(10);
@@ -487,7 +490,7 @@ export default function Practice() {
 
     if (problems.length === 0) return <div style={{ textAlign: 'center', marginTop: '5rem' }}>준비 중...</div>;
 
-    const currentProblem = problems[currentIndex];
+    // const currentProblem = problems[currentIndex]; // Moved to top
 
     return (
         <div className={`card animate-pop ${mode === 'exam' ? 'exam-mode' : ''}`} style={{
