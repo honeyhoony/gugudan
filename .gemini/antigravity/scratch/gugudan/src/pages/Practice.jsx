@@ -56,7 +56,7 @@ export default function Practice() {
     const [maxCombo, setMaxCombo] = useState(0);
     const [gameOver, setGameOver] = useState(false);
     const [volume, setVolume] = useState(0);
-    const [lives, setLives] = useState(3);
+    const [lives, setLives] = useState(5);
     const [gameStarted, setGameStarted] = useState(false);
 
     const wrongProblemsRef = useRef([]);
@@ -78,7 +78,7 @@ export default function Practice() {
     const mode = state?.mode || 'random';
     const selectedDans = state?.dans || [2, 3, 4, 5, 6, 7, 8, 9];
     const voiceEnabled = settings?.voiceEnabled && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-    const maxTime = 10; // Unified to 10s time attack
+    const maxTime = 20; // Increased to 20s for ample correction time
 
     // Audio Analyzer Setup
     const startVolumeMeter = async () => {
@@ -150,6 +150,7 @@ export default function Practice() {
                         if (nc > maxComboRef.current) maxComboRef.current = nc;
                         return nc;
                     });
+                    AudioService.playCorrectSound();
                     confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
                     setTimeout(() => nextProblem(), 800);
                     return 'correct';
@@ -280,6 +281,13 @@ export default function Practice() {
 
                 const results = event.results[event.results.length - 1];
                 const transcript = results[0].transcript.trim();
+
+                // Special Commands Check
+                if (transcript.includes('다시') || transcript.includes('지워') || transcript.includes('삭제')) {
+                    setInputValue('');
+                    return;
+                }
+
                 const number = parseKoreanNumber(transcript);
 
                 if (number !== null) {
@@ -405,7 +413,7 @@ export default function Practice() {
                     </span>
                     {mode === 'exam' && (
                         <div style={{ display: 'flex', gap: '2px' }}>
-                            {[...Array(3)].map((_, i) => (
+                            {[...Array(5)].map((_, i) => (
                                 <span key={i} style={{ fontSize: '1.2rem', opacity: i < lives ? 1 : 0.2, transition: 'opacity 0.3s ease' }}>❤️</span>
                             ))}
                         </div>

@@ -98,4 +98,58 @@ export class AudioService {
         this.isPlaying = false;
         if (this.timerId) clearTimeout(this.timerId);
     }
+
+    static playCorrectSound() {
+        this.init();
+        const t = this.audioCtx.currentTime;
+        // Bright "Ding" or "Clap" like sound
+        const osc = this.audioCtx.createOscillator();
+        const env = this.audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, t);
+        osc.frequency.exponentialRampToValueAtTime(1320, t + 0.1);
+        env.gain.setValueAtTime(0.3, t);
+        env.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+        osc.connect(env);
+        env.connect(this.audioCtx.destination);
+        osc.start(t);
+        osc.stop(t + 0.5);
+
+        // Add a bit of noise for a clap feel
+        const bufferSize = this.audioCtx.sampleRate * 0.1;
+        const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+        const noise = this.audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = this.audioCtx.createBiquadFilter();
+        const nEnv = this.audioCtx.createGain();
+        filter.type = 'highpass';
+        filter.frequency.value = 1000;
+        nEnv.gain.setValueAtTime(0.2, t);
+        nEnv.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+        noise.connect(filter);
+        filter.connect(nEnv);
+        nEnv.connect(this.audioCtx.destination);
+        noise.start(t);
+    }
+
+    static playPerfectSound() {
+        this.init();
+        const t = this.audioCtx.currentTime;
+        // celebratory "Ta-da!" Chord
+        const freqs = [523.25, 659.25, 783.99, 1046.50]; // C Major
+        freqs.forEach((f, i) => {
+            const osc = this.audioCtx.createOscillator();
+            const env = this.audioCtx.createGain();
+            osc.frequency.setValueAtTime(f, t + i * 0.05);
+            env.gain.setValueAtTime(0, t);
+            env.gain.linearRampToValueAtTime(0.1, t + i * 0.05 + 0.02);
+            env.gain.exponentialRampToValueAtTime(0.01, t + 1.5);
+            osc.connect(env);
+            env.connect(this.audioCtx.destination);
+            osc.start(t + i * 0.05);
+            osc.stop(t + 1.5);
+        });
+    }
 }

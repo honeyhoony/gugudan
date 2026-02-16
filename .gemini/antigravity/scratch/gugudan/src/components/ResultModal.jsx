@@ -2,6 +2,7 @@ import { useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 import { RotateCcw, Home, Brain } from 'lucide-react';
+import { AudioService } from '../lib/audioService';
 
 export default function ResultModal({ stats, maxCombo, wrongProblems = [], onHome, onRetry }) {
     const mounted = useRef(false);
@@ -27,6 +28,13 @@ export default function ResultModal({ stats, maxCombo, wrongProblems = [], onHom
                 confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
                 confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
             }, 250);
+
+            // Perfect Performance Sound
+            const total = stats.correct + stats.wrong;
+            const score = Math.round((stats.correct / total) * 100) || 0;
+            if (score === 100) {
+                AudioService.playPerfectSound();
+            }
         }
     }, []);
 
