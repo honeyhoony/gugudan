@@ -57,6 +57,7 @@ export default function Practice() {
     const [gameOver, setGameOver] = useState(false);
     const [volume, setVolume] = useState(0);
     const [lives, setLives] = useState(3);
+    const [gameStarted, setGameStarted] = useState(false);
 
     const wrongProblemsRef = useRef([]);
     const timerRef = useRef(null);
@@ -77,7 +78,7 @@ export default function Practice() {
     const mode = state?.mode || 'random';
     const selectedDans = state?.dans || [2, 3, 4, 5, 6, 7, 8, 9];
     const voiceEnabled = settings?.voiceEnabled && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-    const maxTime = mode === 'exam' ? 7 : 10;
+    const maxTime = 10; // Unified to 10s time attack
 
     // Audio Analyzer Setup
     const startVolumeMeter = async () => {
@@ -175,6 +176,11 @@ export default function Practice() {
         });
     }, [updateStats, inputValue, mode]);
 
+    const handleAnswerRef = useRef(handleAnswer);
+    useEffect(() => {
+        handleAnswerRef.current = handleAnswer;
+    }, [handleAnswer]);
+
     // Used for maxCombo because it's hard to update in setCombo functional update
     const maxComboRef = useRef(0);
 
@@ -216,11 +222,11 @@ export default function Practice() {
         const textA = KOREAN_NAMES[a] || a;
         const textB = KOREAN_NAMES[b] || b;
 
-        // Handle 은/는 based on batchim
+        // Handle 은/는 based on batchim (1=일, 3=삼, 6=육, 7=칠, 8=팔)
         const hasBatchim = [1, 3, 6, 7, 8].includes(Number(b));
         const suffix = hasBatchim ? '은' : '는';
 
-        msg.text = `${textA}${textB}${suffix}?`;
+        msg.text = `${textA}${textB}${suffix}`; // Removed '?' to make it sound more like a prompt
         msg.lang = 'ko-KR';
         msg.rate = 1.1;
         msg.volume = 1.0;
@@ -279,7 +285,7 @@ export default function Practice() {
                 if (number !== null) {
                     setInputValue(String(number));
                     if (results.isFinal) {
-                        handleAnswer(number);
+                        handleAnswerRef.current(number);
                     }
                 }
             };
@@ -309,6 +315,7 @@ export default function Practice() {
 
     // 문제 읽기 및 타이머 - currentIndex 또는 feedback이 바뀔 때 (feedback이 null이 될 때만)
     useEffect(() => {
+        if (!gameStarted) return;
         if (gameOver) {
             AudioService.stopBGM();
             return;
@@ -317,7 +324,15 @@ export default function Practice() {
             speakProblem(problems[currentIndex].a, problems[currentIndex].b);
             startTimer();
         }
-    }, [currentIndex, feedback === null, gameOver]);
+    }, [gameStarted, currentIndex, feedback === null, gameOver]);
+
+    const handleStartGame = () => {
+        setGameStarted(true);
+        AudioService.init();
+        if (mode === 'exam') {
+            AudioService.startExamBGM();
+        }
+    };
 
     // Effect for Timer - Start when feedback is cleared (i.e. new problem) - REMOVED, integrated into above useEffect
     // useEffect(() => {
@@ -350,6 +365,26 @@ export default function Practice() {
             onHome={() => navigate('/dashboard', { replace: true })}
             onRetry={() => window.location.reload()}
         />;
+    }
+
+    if (!gameStarted) {
+        return (
+            <div className="card animate-pop" style={{ maxWidth: '400px', width: '90%', margin: '5rem auto', textAlign: 'center', padding: '2rem' }}>
+                <h2 style={{ fontSize: '1.8rem', marginBottom: '1rem' }}>
+                    {mode === 'exam' ? '🏆 20문제 실전 테스트' : '🎮 게임 준비 완료!'}
+                </h2>
+                <p style={{ opacity: 0.8, marginBottom: '2rem' }}>
+                    {mode === 'exam' ? '틀리면 하트가 깎여요! 조심하세요!' : '박진감 넘치는 게임을 시작할까요?'}
+                </p>
+                <button
+                    className="btn btn-primary"
+                    onClick={handleStartGame}
+                    style={{ padding: '1.2rem', fontSize: '1.2rem' }}
+                >
+                    시작하기!
+                </button>
+            </div>
+        );
     }
 
     if (problems.length === 0) return <div style={{ textAlign: 'center', marginTop: '5rem' }}>준비 중...</div>;

@@ -44,8 +44,23 @@ export const UserProvider = ({ children }) => {
         localStorage.setItem('gugudan_settings', JSON.stringify(settings));
     }, [settings]);
 
-    const toggleVoice = () => {
-        setSettings(prev => ({ ...prev, voiceEnabled: !prev.voiceEnabled }));
+    const toggleVoice = async () => {
+        const nextState = !settings.voiceEnabled;
+
+        if (nextState) {
+            try {
+                // Request microphone permission ONLY when turning voice ON in main dashboard
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                // Stop it immediately, we just wanted to trigger the permission prompt
+                stream.getTracks().forEach(track => track.stop());
+            } catch (err) {
+                console.error("Microphone permission denied:", err);
+                alert("마이크 권한이 필요합니다. 브라우저 설정에서 마이크를 허용해주세요.");
+                return;
+            }
+        }
+
+        setSettings(prev => ({ ...prev, voiceEnabled: nextState }));
     };
 
     return (
