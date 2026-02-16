@@ -199,25 +199,28 @@ export default function Practice() {
         const choices = new Set();
         choices.add(answer);
 
-        while (choices.size < 4) {
-            // Generate plausible wrong answers
-            // Often nearby numbers or numbers from the same multiplication table
-            let wrong;
-            const seed = Math.random();
-            if (seed < 0.3) {
-                // Correct Dan, wrong multiplier
-                wrong = currentProblem.a * (Math.floor(Math.random() * 9) + 1);
-            } else if (seed < 0.6) {
-                // Nearby number
-                wrong = answer + (Math.floor(Math.random() * 5) + 1) * (Math.random() < 0.5 ? 1 : -1);
-            } else {
-                // Purely random result from 2-9 table
-                wrong = (Math.floor(Math.random() * 8) + 2) * (Math.floor(Math.random() * 8) + 2);
-            }
+        const potentialWrong = new Set();
+        // 1. Same Dan, different multiplier
+        for (let i = 1; i <= 9; i++) {
+            if (i !== currentProblem.b) potentialWrong.add(currentProblem.a * i);
+        }
+        // 2. Inverse problem (e.g. 7x8 -> distractors from 8x table)
+        for (let i = 1; i <= 9; i++) {
+            if (i !== currentProblem.a) potentialWrong.add(currentProblem.b * i);
+        }
+        // 3. Very close numbers
+        [1, 2, 10].forEach(offset => {
+            if (answer + offset > 0) potentialWrong.add(answer + offset);
+            if (answer - offset > 0) potentialWrong.add(answer - offset);
+        });
 
-            if (wrong > 0 && !choices.has(wrong)) {
-                choices.add(wrong);
-            }
+        const arrWrong = Array.from(potentialWrong).filter(n => n !== answer);
+        while (choices.size < 4 && arrWrong.length > 0) {
+            const randomIndex = Math.floor(Math.random() * arrWrong.length);
+            choices.add(arrWrong.splice(randomIndex, 1)[0]);
+        }
+        while (choices.size < 4) {
+            choices.add((Math.floor(Math.random() * 8) + 2) * (Math.floor(Math.random() * 8) + 2));
         }
         setOptions(Array.from(choices).sort(() => Math.random() - 0.5));
     }, []);

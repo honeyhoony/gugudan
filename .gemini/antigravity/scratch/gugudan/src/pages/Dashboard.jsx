@@ -10,19 +10,10 @@ export default function Dashboard() {
     const [showSelection, setShowSelection] = useState(false);
     const [examDans, setExamDans] = useState([2, 3, 4, 5, 6, 7, 8, 9]);
 
-    if (!user) {
-        navigate('/');
-        return null;
-    }
-
-    const toggleExamDan = (dan) => {
-        setExamDans(prev => {
-            if (prev.includes(dan)) {
-                return prev.filter(d => d !== dan);
-            } else {
-                return [...prev, dan].sort((a, b) => a - b);
-            }
-        });
+    const toggleExamDan = (num) => {
+        setExamDans(prev =>
+            prev.includes(num) ? prev.filter(n => n !== num) : [...prev, num]
+        );
     };
 
     const handlePractice = (mode) => {
@@ -30,80 +21,51 @@ export default function Dashboard() {
             alert('최소 하나 이상의 단을 선택해주세요!');
             return;
         }
-
-        navigate('/practice', {
-            state: {
-                mode: mode,
-                dans: examDans,
-                voiceEnabled: settings.voiceEnabled
-            }
-        });
+        navigate('/practice', { state: { mode, dans: examDans } });
     };
 
+    if (!user) return null;
+
     return (
-        <div className="card animate-pop" style={{ maxWidth: '600px', width: '95%', margin: '0 auto' }}>
+        <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem' }}>
             {/* Header */}
-            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-                <h1 style={{ fontSize: '2.2rem', marginBottom: '0.5rem' }}>🎯 구구단 마스터</h1>
-                <p style={{ opacity: 0.8 }}>반가워요, {user.name}!</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                <div>
+                    <h1 style={{ fontSize: '1.2rem', margin: 0 }}>안녕하세요, {user.name} 👋</h1>
+                    <p style={{ fontSize: '0.9rem', opacity: 0.7, margin: 0 }}>오늘도 즐겁게 구구단을 배워봐요!</p>
+                </div>
+                <div style={{ background: 'var(--primary)', color: 'white', padding: '0.5rem 1rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                    Lv.{Math.floor((user.stats?.totalCorrect || 0) / 50) + 1}
+                </div>
             </div>
 
-            {/* 1. 전체 구구단 표 */}
+            {/* 1. 학습 */}
             <section style={{ marginBottom: '2.5rem' }}>
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
-                    <BookOpen size={24} color="var(--primary)" /> 1. 전체 구구단 표
+                    <BookOpen size={24} color="var(--primary)" /> 1. 구구단 학습
                 </h3>
-
-                {!showSelection ? (
-                    <button className="btn btn-outline" onClick={() => setShowSelection(true)}>
-                        구구단 전체 표 보기
-                    </button>
-                ) : (
-                    <div className="animate-pop">
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem', marginBottom: '1rem' }}>
-                            {[2, 3, 4, 5, 6, 7, 8, 9].map(num => (
-                                <button
-                                    key={num}
-                                    className={`btn ${selectedDan === num ? 'btn-primary' : 'btn-outline'}`}
-                                    style={{ fontSize: '1.1rem', padding: '0.8rem 0', margin: 0 }}
-                                    onClick={() => setSelectedDan(selectedDan === num ? null : num)}
-                                >
-                                    {num}단
-                                </button>
-                            ))}
-                        </div>
-
-                        {selectedDan && (
-                            <div className="animate-pop" style={{
-                                padding: '1rem',
-                                background: 'rgba(255,255,255,0.05)',
-                                borderRadius: '12px',
-                                display: 'grid',
-                                gridTemplateColumns: '1fr 1fr',
-                                gap: '0.5rem',
-                                border: '1px solid rgba(0,0,0,0.1)'
-                            }}>
-                                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => (
-                                    <div key={i} style={{ fontSize: '1.1rem', textAlign: 'center' }}>
-                                        {selectedDan} × {i} = <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{selectedDan * i}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        <button className="btn-outline" onClick={() => { setShowSelection(false); setSelectedDan(null); }} style={{ marginTop: '1rem', border: 'none', fontSize: '0.9rem', opacity: 0.6 }}>
-                            접기
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+                    {[2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+                        <button
+                            key={num}
+                            className="btn btn-outline"
+                            style={{ fontSize: '1.1rem', padding: '0.8rem 0' }}
+                            onClick={() => navigate(`/learn/${num}`)}
+                        >
+                            {num}단
                         </button>
-                    </div>
-                )}
+                    ))}
+                </div>
             </section>
 
             {/* 2. 설정 */}
-            <section style={{ marginBottom: '2.5rem' }}>
-                <div style={{ marginBottom: '1.5rem' }}>
-                    <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
-                        <Brain size={24} color="var(--secondary)" /> 2. 오디오 설정
-                    </h3>
+            <section style={{ marginBottom: '2.5rem', textAlign: 'left' }}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.5rem' }}>
+                    <Brain size={24} color="var(--secondary)" /> 2. 설정
+                </h3>
 
+                <div style={{ marginBottom: '1.5rem', paddingLeft: '0.5rem' }}>
+                    <p style={{ fontSize: '1rem', fontWeight: 'bold', marginBottom: '0.8rem', opacity: 0.9 }}>📢 오디오 설정</p>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
                         <button
                             onClick={() => toggleSetting('micEnabled')}
@@ -132,25 +94,25 @@ export default function Dashboard() {
                             효과음 {settings.sfxEnabled ? 'ON' : 'OFF'}
                         </button>
                     </div>
+                </div>
 
-                    <div style={{ marginTop: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                        <p style={{ fontSize: '0.9rem', fontWeight: 'bold', margin: 0, opacity: 0.8 }}>🔢 입력 방식</p>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                            <button
-                                onClick={() => setSetting('inputMethod', 'keypad')}
-                                className={`btn ${settings.inputMethod === 'keypad' ? 'btn-secondary' : 'btn-outline'}`}
-                                style={{ padding: '0.8rem', fontSize: '0.9rem' }}
-                            >
-                                계산기 키패드
-                            </button>
-                            <button
-                                onClick={() => setSetting('inputMethod', 'choice')}
-                                className={`btn ${settings.inputMethod === 'choice' ? 'btn-secondary' : 'btn-outline'}`}
-                                style={{ padding: '0.8rem', fontSize: '0.9rem' }}
-                            >
-                                4지선다 선택지
-                            </button>
-                        </div>
+                <div style={{ marginBottom: '1.5rem', paddingLeft: '0.5rem' }}>
+                    <p style={{ fontSize: '1rem', fontWeight: 'bold', marginBottom: '0.8rem', opacity: 0.9 }}>🔢 입력 방식 설정</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                        <button
+                            onClick={() => setSetting('inputMethod', 'keypad')}
+                            className={`btn ${settings.inputMethod === 'keypad' ? 'btn-secondary' : 'btn-outline'}`}
+                            style={{ padding: '0.8rem', fontSize: '0.9rem' }}
+                        >
+                            계산기 키패드
+                        </button>
+                        <button
+                            onClick={() => setSetting('inputMethod', 'choice')}
+                            className={`btn ${settings.inputMethod === 'choice' ? 'btn-secondary' : 'btn-outline'}`}
+                            style={{ padding: '0.8rem', fontSize: '0.9rem' }}
+                        >
+                            4지선다 선택지
+                        </button>
                     </div>
                 </div>
 
@@ -208,4 +170,3 @@ export default function Dashboard() {
         </div>
     );
 }
-
