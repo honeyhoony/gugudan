@@ -112,9 +112,16 @@ export default function Dashboard() {
                         </button>
                     </div>
                 </div>
+            </section>
+
+            {/* 3. 연습하기 */}
+            <section style={{ marginBottom: '2.5rem' }}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.5rem' }}>
+                    <List size={24} color="var(--primary)" /> 3. 연습하기
+                </h3>
 
                 {/* Range Selection Shared */}
-                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '16px', marginBottom: '1.5rem', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '16px', marginBottom: '1.5rem', border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
                         <h4 style={{ margin: 0, fontSize: '1rem' }}>연습할 단을 선택하세요</h4>
                         <div style={{ display: 'flex', gap: '5px' }}>
@@ -150,10 +157,10 @@ export default function Dashboard() {
                 </div>
             </section>
 
-            {/* 3. 실력 점검 */}
+            {/* 4. 실력 점검 */}
             <section>
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
-                    <Trophy size={24} color="#FFD700" /> 3. 실력 점검 (게임)
+                    <Trophy size={24} color="#FFD700" /> 4. 실력 점검 (게임)
                 </h3>
 
                 <button
