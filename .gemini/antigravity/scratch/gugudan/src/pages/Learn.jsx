@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Play, Square, Mic, MicOff, Star, CheckCircle, RefreshCcw, Volume2 } from 'lucide-react';
+import { ArrowLeft, Play, Square, Mic, MicOff, Star, CheckCircle, RefreshCcw, Eye, Volume2 } from 'lucide-react';
 import { AudioService } from '../lib/audioService';
+import { useUser } from '../context/UserContext';
 
 const KOREAN_DIGITS = ['공', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구'];
 
@@ -38,12 +39,14 @@ export default function Learn() {
     const navigate = useNavigate();
     const danNum = parseInt(dan);
 
-    const [mode, setMode] = useState('speaking'); // 'speaking' or 'listening'
+    const { user, settings } = useUser(); // Get settings for SFX
+    const [mode, setMode] = useState('viewing'); // 'viewing' (was listening) or 'speaking'
 
     // Speaking Mode State
     const [currentStep, setCurrentStep] = useState(1);
     const [isListening, setIsListening] = useState(false);
     const [feedback, setFeedback] = useState(null); // 'correct', 'wrong'
+    const [lastTranscript, setLastTranscript] = useState(''); // Show what was heard
     const [volume, setVolume] = useState(0);
 
     // Listening Mode State (Legacy)
@@ -109,34 +112,30 @@ export default function Learn() {
     const textToNumbers = (text) => {
         // Simple parser to extract numbers from Korean text
         // "이 일은 이" -> [2, 1, 2]
-        // "2 1은 2" -> [2, 1, 2]
 
-        // 1. First, replace known Korean number words with spaces surrounding them to isolate
         let processed = text;
-
         // Handle common digit strings
         processed = processed.replace(/[0-9]+/g, (match) => ` ${match} `);
 
-        // Map Korean words to digits? 
-        // Iterate KOREAN_NUMBERS_MAP keys and if found, replace with digit?
-        // Be careful with substrings (e.g. '십' in '이십'). Sort by length descending.
         const sortedKeys = Object.keys(KOREAN_NUMBERS_MAP).sort((a, b) => b.length - a.length);
 
-        // We will try to find numbers in the string
-        // Actually, simpler approach: Split by space, parse each token.
-        // But Speech API often groups "이십" as one token.
-
-        // Let's create a cleaner string with only numbers and spaces
+        // Replace Korean number words with digits
         let numberString = processed;
         sortedKeys.forEach(key => {
             const val = KOREAN_NUMBERS_MAP[key];
-            // Replace key with just value
             numberString = numberString.split(key).join(` ${val} `);
         });
 
         // Split and filter
         const nums = numberString.split(/[^0-9]+/).filter(s => s.trim() !== '').map(Number);
         return nums;
+    };
+
+    const playSFX = (type) => {
+        if (!settings.sfxEnabled) return;
+        if (type === 'correct') AudioService.playCorrectSound();
+        if (type === 'wrong') AudioService.playWrongSound();
+        if (type === 'perfect') AudioService.playPerfectSound();
     };
 
     const checkSpeech = (transcript) => {
@@ -184,31 +183,32 @@ export default function Learn() {
             console.log("Transcript:", transcript);
 
             if (event.results[0].isFinal) {
+                setLastTranscript(transcript); // Show what was heard
                 if (checkSpeech(transcript)) {
                     // Correct!
-                    AudioService.playCorrectSound();
+                    playSFX('correct');
                     setFeedback('correct');
                     recognition.stop();
                     setTimeout(() => {
                         setFeedback(null);
+                        setLastTranscript('');
                         if (currentStep < 9) {
                             setCurrentStep(prev => prev + 1);
                         } else {
-                            // Completed all!
-                            // Play fanfare?
-                            AudioService.playPerfectSound();
+                            playSFX('perfect');
                             alert("와우! 모든 단계를 완료했어요! 참 잘했어요!");
                             navigate('/dashboard');
                         }
                     }, 1000);
                 } else {
                     // Wrong
-                    AudioService.playWrongSound();
+                    playSFX('wrong');
                     setFeedback('wrong');
                     recognition.stop();
                     setTimeout(() => {
                         setFeedback(null);
-                        // Restart listening automatically? Maybe better to let user click again or restart automatically
+                        setLastTranscript('');
+                        // Auto restart logic will handle restarting
                     }, 1000);
                 }
             }
@@ -219,15 +219,18 @@ export default function Learn() {
             stopVolumeMeter();
             // If feedback is null (meaning no result or mid-process), maybe we should restart if user didn't speak?
             // But let's require manual click for now to avoid loops, unless successful.
-            if (feedback === null && mode === 'speaking') {
-                // Maybe auto-restart if silence? 
-                // For now, let's keep it manual or auto-restart if we want continuous flow.
-                // The user wants "Say correctly -> Next".
-                // If silence, just stop.
+            // If normal end (silence or stopped), and we are still in speaking mode and not finished
+            if (mode === 'speaking' && currentStep <= 9 && feedback !== 'correct') {
+                // Auto restart to keep "always on" feel
+                setTimeout(() => {
+                    if (recognitionRef.current && mode === 'speaking') {
+                        try { recognition.start(); } catch (e) { }
+                    }
+                }, 100);
             }
+
             if (feedback === 'correct' && currentStep < 9) {
-                // Auto start next?
-                // Wait a bit for the effect to finish, then restart mic for next step
+                // Auto start next after delay
                 setTimeout(() => {
                     startListening();
                 }, 1500);
@@ -352,7 +355,23 @@ export default function Learn() {
                 </button>
                 <div style={{ display: 'flex', gap: '5px', background: '#f1f5f9', padding: '4px', borderRadius: '12px' }}>
                     <button
-                        onClick={() => { setMode('speaking'); setIsPlaying(false); window.speechSynthesis.cancel(); }}
+                        onClick={() => { setMode('viewing'); stopListening(); }}
+                        style={{
+                            padding: '0.5rem 1rem',
+                            borderRadius: '8px',
+                            border: 'none',
+                            background: mode === 'viewing' ? '#fff' : 'transparent',
+                            boxShadow: mode === 'viewing' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
+                            fontWeight: mode === 'viewing' ? 'bold' : 'normal',
+                            color: mode === 'viewing' ? '#3b82f6' : '#64748b',
+                            fontSize: '0.9rem',
+                            display: 'flex', alignItems: 'center', gap: '4px'
+                        }}
+                    >
+                        <Eye size={16} /> 보기
+                    </button>
+                    <button
+                        onClick={() => { setMode('speaking'); setIsPlaying(false); window.speechSynthesis.cancel(); AudioService.init(); startListening(); }}
                         style={{
                             padding: '0.5rem 1rem',
                             borderRadius: '8px',
@@ -367,28 +386,12 @@ export default function Learn() {
                     >
                         <Mic size={16} /> 말하기
                     </button>
-                    <button
-                        onClick={() => { setMode('listening'); stopListening(); }}
-                        style={{
-                            padding: '0.5rem 1rem',
-                            borderRadius: '8px',
-                            border: 'none',
-                            background: mode === 'listening' ? '#fff' : 'transparent',
-                            boxShadow: mode === 'listening' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
-                            fontWeight: mode === 'listening' ? 'bold' : 'normal',
-                            color: mode === 'listening' ? '#3b82f6' : '#64748b',
-                            fontSize: '0.9rem',
-                            display: 'flex', alignItems: 'center', gap: '4px'
-                        }}
-                    >
-                        <Volume2 size={16} /> 듣기
-                    </button>
                 </div>
                 <div style={{ width: '40px' }}></div>
             </div>
 
             <h2 style={{ textAlign: 'center', margin: '0 0 1.5rem', fontSize: '1.8rem', fontWeight: 'bold' }}>
-                {danNum}단 {mode === 'speaking' ? '말하기 도전!' : '듣기 연습'}
+                {danNum}단 {mode === 'speaking' ? '말하기 도전!' : '공부하기'}
             </h2>
 
             {/* Speaking Mode UI */}
@@ -403,23 +406,28 @@ export default function Learn() {
                         border: `2px solid ${feedback === 'wrong' ? '#ef4444' : feedback === 'correct' ? '#22c55e' : isListening ? '#3b82f6' : '#e2e8f0'}`,
                         transition: 'all 0.3s ease'
                     }}>
-                        <div style={{ fontSize: '1.1rem', marginBottom: '1rem', color: '#64748b' }}>
-                            {feedback === 'correct' ? '정답입니다! 🎉' : feedback === 'wrong' ? '땡! 다시 말해보세요 😅' : isListening ? '듣고 있어요... 말해보세요!' : '마이크 버튼을 눌러 시작하세요'}
+                        <div style={{ fontSize: '1.1rem', marginBottom: '1rem', color: '#64748b', minHeight: '1.5em' }}>
+                            {feedback === 'correct' ? '정답입니다! 🎉' : feedback === 'wrong' ? '다시 한번 말해보세요! 😅' : isListening ? `듣고 있어요... ${lastTranscript}` : '마이크 준비 중...'}
                         </div>
 
                         {/* Visualizer / Icon */}
-                        <div style={{ height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             {isListening ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    {[...Array(5)].map((_, i) => (
-                                        <div key={i} style={{
-                                            width: '6px',
-                                            height: `${20 + Math.random() * volume * 2}px`,
-                                            background: '#3b82f6',
-                                            borderRadius: '3px',
-                                            transition: 'height 0.1s ease'
-                                        }} />
-                                    ))}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {[...Array(7)].map((_, i) => {
+                                        // Randomize height based on volume
+                                        // Use sine wave pattern for base + random jitter
+                                        const h = Math.min(60, 10 + (volume * 1.5) + Math.random() * 20);
+                                        return (
+                                            <div key={i} style={{
+                                                width: '8px',
+                                                height: `${h}px`,
+                                                background: '#3b82f6',
+                                                borderRadius: '4px',
+                                                transition: 'height 0.05s ease'
+                                            }} />
+                                        )
+                                    })}
                                 </div>
                             ) : (
                                 <MicOff size={40} color="#cbd5e1" />
@@ -482,37 +490,29 @@ export default function Learn() {
                 </div>
             )}
 
-            {/* Listening Mode UI (Old) */}
-            {mode === 'listening' && (
+            {/* Viewing Mode UI (Renamed from Listening) */}
+            {mode === 'viewing' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                        <button
-                            className={`btn ${isPlaying ? 'btn-outline' : 'btn-primary'}`}
-                            onClick={togglePlay}
-                            style={{ padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                        >
-                            {isPlaying ? <Square size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
-                            {isPlaying ? '멈춤' : '듣기 시작'}
-                        </button>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
+                        {/* Listen button removed as requested */}
                         <button
                             className="btn btn-outline"
                             onClick={toggleDirection}
                             style={{ padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                         >
                             <RefreshCcw size={20} />
-                            {direction === 'asc' ? '차례대로' : '거꾸로'}
+                            {direction === 'asc' ? '차례대로 보기' : '거꾸로 보기'}
                         </button>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden' }}>
                         {currentStep && [1, 2, 3, 4, 5, 6, 7, 8, 9].map((step) => { // Just use constant array
                             const actualStep = direction === 'asc' ? step : (10 - step);
-                            const isActive = actualStep === highlightedStep;
                             return (
                                 <div key={actualStep} style={{
                                     display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.8rem 1.2rem',
-                                    background: isActive ? '#3b82f6' : '#fff',
-                                    color: isActive ? '#fff' : '#1e293b',
+                                    background: '#fff',
+                                    color: '#1e293b',
                                     borderBottom: '1px solid #f1f5f9'
                                 }}>
                                     <span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>{danNum} × {actualStep}</span>
