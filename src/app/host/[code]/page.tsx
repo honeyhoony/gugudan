@@ -148,7 +148,7 @@ export default function HostPage() {
 
         <aside className="panel rounded-3xl p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-bold">참가자 {state.players.length}</h2>
+            <h2 className="font-bold">선수 {state.players.length}</h2>
             <button
               type="button"
               className="text-xs text-white/50 underline"
@@ -228,14 +228,14 @@ function ModeTabs({
 function LobbyView({ count, code }: { count: number; code: string }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center text-center">
-      <p className="text-white/60">참가자를 모으는 중</p>
+      <p className="text-white/60">선수 입장 중 · 개회 대기</p>
       <p className="brand-display mt-3 text-7xl text-white md:text-8xl">
         {count}
       </p>
-      <p className="mt-2 text-xl text-white/70">명 접속</p>
+      <p className="mt-2 text-xl text-white/70">명 등록</p>
       <p className="mt-8 max-w-md text-white/55">
         휴대폰에서 <span className="text-[var(--gold)]">{code}</span> 입력, 또는
-        QR 스캔 후 닉네임을 치면 바로 들어옵니다.
+        QR 스캔 후 닉네임으로 선수 등록하세요.
       </p>
     </div>
   );
@@ -271,9 +271,9 @@ function OxHostView({
     return (
       <div className="flex flex-1 flex-col justify-center gap-6">
         <div>
-          <h2 className="brand-display text-4xl md:text-5xl">O / X 퀴즈</h2>
+          <h2 className="brand-display text-4xl md:text-5xl">O / X 경기</h2>
           <p className="mt-2 text-white/60">
-            문제를 내면 휴대폰에 O/X 버튼이 뜹니다.
+            문제를 내면 선수 휴대폰에 O/X 버튼이 뜹니다.
           </p>
         </div>
         <div className="grid gap-3 md:grid-cols-[1fr_auto]">
@@ -390,8 +390,8 @@ function RandomHostView({
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center text-center">
-      <h2 className="brand-display text-4xl md:text-5xl">랜덤 한 명</h2>
-      <p className="mt-2 text-white/60">참가자 중에서 극적으로 뽑습니다.</p>
+      <h2 className="brand-display text-4xl md:text-5xl">랜덤 선수</h2>
+      <p className="mt-2 text-white/60">등록된 선수 중에서 한 명을 뽑습니다.</p>
 
       <div
         className={`mt-10 flex h-56 w-56 items-center justify-center rounded-full border-4 border-[var(--gold)]/50 bg-black/30 ${
@@ -439,8 +439,8 @@ function ReactionHostView({
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center text-center">
-      <h2 className="brand-display text-4xl md:text-5xl">순발력</h2>
-      <p className="mt-2 text-white/60">불이 켜지면 휴대폰을 가장 빨리!</p>
+      <h2 className="brand-display text-4xl md:text-5xl">순발력 경기</h2>
+      <p className="mt-2 text-white/60">신호가 켜지면 휴대폰을 가장 빨리!</p>
 
       <div className="mt-10 flex min-h-48 w-full max-w-xl items-center justify-center rounded-3xl bg-black/30 p-8">
         {phase === "idle" ? (

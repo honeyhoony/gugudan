@@ -87,13 +87,13 @@ export default function PlayPage() {
         <div className="w-full max-w-sm">
           <p className="brand-display text-3xl text-[var(--gold)]">한판</p>
           <h1 className="mt-2 text-2xl font-bold">방 {code}</h1>
-          <p className="mt-1 text-sm text-white/60">닉네임을 치고 입장하세요</p>
+          <p className="mt-1 text-sm text-white/60">선수 이름으로 등록하세요</p>
           <form onSubmit={onJoin} className="mt-6 space-y-3">
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={12}
-              placeholder="닉네임"
+              placeholder="선수 이름"
               className="w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-lg outline-none focus:ring-2 focus:ring-teal-300"
               autoFocus
             />
@@ -102,7 +102,7 @@ export default function PlayPage() {
               disabled={pending}
               className="btn btn-sea w-full"
             >
-              {pending ? "입장 중…" : "입장"}
+              {pending ? "등록 중…" : "선수 등록"}
             </button>
           </form>
           {msg ? <p className="mt-3 text-sm text-red-200">{msg}</p> : null}
@@ -131,11 +131,11 @@ export default function PlayPage() {
       <section className="panel mt-5 flex flex-1 flex-col rounded-3xl p-5">
         {state.mode === "lobby" ? (
           <div className="flex flex-1 flex-col items-center justify-center text-center">
-            <p className="text-white/60">대기 중</p>
+            <p className="text-white/60">개회 대기</p>
             <p className="brand-display mt-3 text-5xl">{state.players.length}</p>
-            <p className="mt-1 text-white/60">명과 함께</p>
+            <p className="mt-1 text-white/60">명 선수</p>
             <p className="mt-6 text-sm text-white/45">
-              큰 화면에서 게임이 시작되면 여기에 조작이 나타납니다.
+              큰 화면에서 경기가 시작되면 여기에 조작이 나타납니다.
             </p>
           </div>
         ) : null}

@@ -15,7 +15,7 @@ export function ScoreList({
 
   if (sorted.length === 0) {
     return (
-      <p className="text-white/50">아직 참가자가 없습니다. QR을 보여주세요.</p>
+      <p className="text-white/50">아직 선수가 없습니다. QR을 보여주세요.</p>
     );
   }
 
