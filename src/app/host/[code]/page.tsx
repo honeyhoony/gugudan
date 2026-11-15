@@ -3,12 +3,14 @@
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { JoinQr } from "@/components/JoinQr";
+import { PowerMeter } from "@/components/PowerMeter";
 import { ScoreList } from "@/components/ScoreList";
 import { SolarLadder } from "@/components/SolarLadder";
 import { TreasureMap } from "@/components/TreasureMap";
 import { TREASURE_SPOTS } from "@/lib/content";
 import { hostCommand, hostStorageKey } from "@/lib/client";
 import { useRoom } from "@/hooks/useRoom";
+import { badgeLabel, formatKwh, rankByTarget, readingAt } from "@/lib/kwh";
 import type { GameMode, RoomState } from "@/lib/types";
 
 export default function HostPage() {
@@ -157,6 +159,15 @@ export default function HostPage() {
                 onReset={() => run("moleReset")}
               />
             ) : null}
+            {state.mode === "kwh" ? (
+              <KwhHostView
+                state={state}
+                pending={pending}
+                onStart={() => run("kwhStart")}
+                onReveal={() => run("kwhReveal")}
+                onReset={() => run("kwhReset")}
+              />
+            ) : null}
           </div>
         </section>
 
@@ -205,11 +216,12 @@ function ModeTabs({
 }) {
   const items: { id: GameMode; label: string }[] = [
     { id: "lobby", label: "대기실" },
+    { id: "ladder", label: "1 사다리" },
+    { id: "mash", label: "2 연타" },
+    { id: "kwh", label: "3 5.00kWh" },
+    { id: "mole", label: "4 두더지" },
     { id: "ox", label: "O/X" },
     { id: "treasure", label: "오봉산" },
-    { id: "ladder", label: "사다리" },
-    { id: "mash", label: "연타!!" },
-    { id: "mole", label: "대기전력" },
   ];
   return (
     <div className="flex flex-wrap gap-2">
@@ -240,7 +252,7 @@ function LobbyView({ count, code }: { count: number; code: string }) {
       <p className="mt-2 text-xl text-white/70">명 등록</p>
       <p className="mt-8 max-w-md text-white/55">
         휴대폰에서 <span className="text-[var(--gold)]">{code}</span> 입력 후
-        선수 등록 · O/X · 보물 · 사다리 · 연타 · 대기전력잡기
+        1 전력망 사다리 → 2 연타 → 3 목표 5.00 kWh → 4 대기전력 두더지
       </p>
     </div>
   );
@@ -273,9 +285,9 @@ function MashHostView({
 
   return (
     <div className="flex flex-1 flex-col">
-      <h2 className="brand-display text-4xl md:text-5xl">연타!! 챌린지</h2>
+      <h2 className="brand-display text-4xl md:text-5xl">에너지 다이어트 연타</h2>
       <p className="mt-2 text-white/60">
-        저급한 닌텐도 파티 감성. 5초 동안 미친 듯이 터치!
+        2라운드 광클 아케이드. 5초 동안 미친 듯이 터치!
       </p>
       <div className="mt-8 flex flex-1 flex-col items-center justify-center text-center">
         {m.phase === "idle" ? (
@@ -348,9 +360,9 @@ function MoleHostView({
 
   return (
     <div className="flex flex-1 flex-col">
-      <h2 className="brand-display text-4xl md:text-5xl">대기전력 잡기</h2>
+      <h2 className="brand-display text-4xl md:text-5xl">대기전력 뱀파이어</h2>
       <p className="mt-2 text-white/60">
-        켜진 대기전력(빨간 불)을 휴대폰으로 팡팡 두드리기. 아케이드 두더지!
+        4라운드 복불복. 빨간 ON(대기전력)을 휴대폰으로 팡팡!
       </p>
       <div className="mt-6 grid grid-cols-3 gap-3 md:gap-4">
         {Array.from({ length: m.slots }, (_, i) => {
@@ -601,9 +613,9 @@ function LadderHostView({
     return (
       <div className="flex flex-1 flex-col justify-center gap-5">
         <div>
-          <h2 className="brand-display text-4xl md:text-5xl">태양광 사다리</h2>
+          <h2 className="brand-display text-4xl md:text-5xl">전력망 사다리</h2>
           <p className="mt-2 text-white/60">
-            패널 모양 사다리로 결과(미션·보너스)를 뽑습니다.
+            1라운드 운빨. 태양광 패널 사다리로 미션·자리 뽑기!
           </p>
         </div>
         <SolarLadder
@@ -675,6 +687,123 @@ function LadderHostView({
             );
           })}
         </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function KwhHostView({
+  state,
+  pending,
+  onStart,
+  onReveal,
+  onReset,
+}: {
+  state: RoomState;
+  pending: boolean;
+  onStart: () => void;
+  onReveal: () => void;
+  onReset: () => void;
+}) {
+  const k = state.kwh;
+  const stopped = Object.keys(k.stops).length;
+  const live =
+    k.phase === "play" && k.startedAt ? readingAt(k.startedAt) : 0;
+  const remain =
+    k.endsAt != null ? Math.max(0, Math.ceil((k.endsAt - Date.now()) / 1000)) : 0;
+  const ranked = rankByTarget(k.stops, k.target);
+
+  return (
+    <div className="flex flex-1 flex-col gap-4">
+      <div>
+        <p className="text-sm font-medium text-[var(--gold)]">3라운드 · 메인 종목</p>
+        <h2 className="brand-display mt-1 text-3xl md:text-5xl">
+          목표 전력 {k.target.toFixed(2)} kWh 사수
+        </h2>
+        <p className="mt-2 max-w-2xl text-white/65">
+          이번 달 목표 전력량은 정확히 {k.target.toFixed(2)} kWh!
+          과부하도, 절전 미달도 안 됩니다. 감각으로 STOP.
+        </p>
+      </div>
+
+      {k.phase === "idle" ? (
+        <div className="flex flex-1 flex-col justify-center gap-5">
+          <PowerMeter value={0} target={k.target} large />
+          <button type="button" disabled={pending} onClick={onStart} className="btn btn-primary w-fit">
+            계측 시작
+          </button>
+        </div>
+      ) : null}
+
+      {k.phase === "countdown" ? (
+        <div className="flex flex-1 flex-col items-center justify-center">
+          <p className="text-white/50">계측 준비</p>
+          <p className="brand-display anim-go mt-3 text-8xl text-[var(--gold)]">
+            {remain || "GO"}
+          </p>
+        </div>
+      ) : null}
+
+      {k.phase === "play" ? (
+        <>
+          <PowerMeter value={live} hidden target={k.target} large label="현장 계측 중 (선수 화면 가림)" />
+          <p className="text-white/55">
+            STOP {stopped}/{state.players.length} · 자동마감 {remain}초
+          </p>
+          <ul className="flex flex-wrap gap-2 text-sm">
+            {state.players.map((p) => (
+              <li
+                key={p.id}
+                className={`rounded-full px-3 py-1 ${
+                  k.stops[p.id] != null ? "bg-teal-500/30 text-teal-100" : "bg-white/10 text-white/50"
+                }`}
+              >
+                {p.name} {k.stops[p.id] != null ? "차단" : "계측중"}
+              </li>
+            ))}
+          </ul>
+          <button type="button" disabled={pending || stopped < 1} onClick={onReveal} className="btn btn-primary w-fit">
+            결과 공개
+          </button>
+        </>
+      ) : null}
+
+      {k.phase === "reveal" ? (
+        <>
+          <p className="brand-display text-2xl text-[var(--gold)]">
+            1등 {state.players.find((p) => p.id === ranked[0]?.playerId)?.name ?? "?"}
+            {ranked[0] ? ` · ${formatKwh(ranked[0].value)} kWh` : ""}
+          </p>
+          <ol className="grid gap-2 md:grid-cols-2">
+            {ranked.map((row, i) => {
+              const name = state.players.find((p) => p.id === row.playerId)?.name ?? "?";
+              return (
+                <li key={row.playerId} className="rounded-xl bg-white/5 px-3 py-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold">
+                      {i + 1}. {name}
+                    </span>
+                    <span className="font-mono text-[var(--gold)]">
+                      {formatKwh(row.value)} kWh
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-white/55">
+                    오차 {formatKwh(row.delta)} · {badgeLabel(row.badge)}
+                  </p>
+                </li>
+              );
+            })}
+          </ol>
+          <button type="button" disabled={pending} onClick={onReset} className="btn btn-ghost w-fit">
+            다시 계측
+          </button>
+        </>
+      ) : null}
+
+      {k.phase !== "idle" && k.phase !== "reveal" ? (
+        <button type="button" disabled={pending} onClick={onReset} className="btn btn-ghost w-fit">
+          리셋
+        </button>
       ) : null}
     </div>
   );

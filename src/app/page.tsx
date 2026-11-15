@@ -60,7 +60,7 @@ export default function HomePage() {
           <p className="mt-5 max-w-md text-lg leading-relaxed text-white/75 md:text-xl">
             프로젝터는 경기장, 휴대폰은 선수 컨트롤러.
             <br />
-            O/X · 보물찾기 · 사다리 · 연타 · 대기전력잡기.
+            사다리 · 연타 · 목표 5.00 kWh · 대기전력 두더지.
           </p>
         </div>
 

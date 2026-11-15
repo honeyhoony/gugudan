@@ -9,6 +9,7 @@ import {
   useTransition,
 } from "react";
 import { useParams } from "next/navigation";
+import { PowerMeter } from "@/components/PowerMeter";
 import { TREASURE_SPOTS } from "@/lib/content";
 import {
   joinRoom,
@@ -17,6 +18,7 @@ import {
 } from "@/lib/client";
 import { useRoom } from "@/hooks/useRoom";
 import { ScoreList } from "@/components/ScoreList";
+import { badgeLabel, formatKwh, kwhBadge, readingAt } from "@/lib/kwh";
 
 type SavedPlayer = { id: string; name: string };
 
@@ -201,6 +203,18 @@ export default function PlayPage() {
             onHit={(slot) => run("moleHit", { slot })}
           />
         ) : null}
+
+        {state.mode === "kwh" ? (
+          <KwhPlay
+            phase={state.kwh.phase}
+            target={state.kwh.target}
+            endsAt={state.kwh.endsAt}
+            startedAt={state.kwh.startedAt}
+            myStop={player ? state.kwh.stops[player.id] : undefined}
+            pending={pending}
+            onStop={() => run("kwhStop")}
+          />
+        ) : null}
       </section>
 
       <section className="mt-4 rounded-2xl bg-black/20 p-4">
@@ -372,6 +386,92 @@ function TreasurePlay({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function KwhPlay({
+  phase,
+  target,
+  endsAt,
+  startedAt,
+  myStop,
+  pending,
+  onStop,
+}: {
+  phase: string;
+  target: number;
+  endsAt: number | null;
+  startedAt: number | null;
+  myStop?: number;
+  pending: boolean;
+  onStop: () => void;
+}) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (phase !== "play" && phase !== "countdown") return;
+    const id = setInterval(() => setTick((n) => n + 1), 50);
+    return () => clearInterval(id);
+  }, [phase]);
+
+  if (phase === "idle") {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center text-center text-white/55">
+        <p>목표 전력 {target.toFixed(2)} kWh 사수</p>
+        <p className="mt-2 text-sm">진행자가 계측을 시작하면 시작됩니다</p>
+      </div>
+    );
+  }
+
+  if (phase === "countdown") {
+    const remain = endsAt ? Math.max(1, Math.ceil((endsAt - Date.now()) / 1000)) : 3;
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center">
+        <p className="text-white/50">계측 준비</p>
+        <p className="brand-display anim-go mt-2 text-7xl text-[var(--gold)]">{remain}</p>
+        <p className="mt-3 text-sm text-white/60">감각으로 5.00을 노리세요</p>
+      </div>
+    );
+  }
+
+  if (myStop != null && myStop >= 0) {
+    const badge = kwhBadge(myStop, target);
+    return (
+      <div className="flex flex-1 flex-col justify-center gap-4">
+        <PowerMeter value={myStop} target={target} label="내 차단 전력" />
+        <p className="text-center text-lg text-[var(--gold)]">{badgeLabel(badge)}</p>
+        <p className="text-center text-sm text-white/50">
+          {phase === "reveal" ? "결과 공개됨 · 큰 화면 확인!" : "다른 선수 대기 중…"}
+        </p>
+      </div>
+    );
+  }
+
+  if (phase === "reveal") {
+    return (
+      <div className="flex flex-1 items-center justify-center text-white/55">
+        STOP하지 못했습니다
+      </div>
+    );
+  }
+
+  const live = startedAt ? readingAt(startedAt) : 0;
+
+  return (
+    <div className="flex flex-1 flex-col gap-4">
+      <p className="text-sm text-white/50">
+        목표 {formatKwh(target)} kWh · 감각으로 STOP!
+      </p>
+      <PowerMeter value={live} hidden target={target} label="스마트 전력량계" />
+      <button
+        type="button"
+        disabled={pending}
+        onClick={onStop}
+        className="btn btn-primary flex min-h-28 flex-1 brand-display text-4xl"
+      >
+        STOP
+        <span className="ml-2 text-lg font-sans font-semibold">차단/저장</span>
+      </button>
     </div>
   );
 }

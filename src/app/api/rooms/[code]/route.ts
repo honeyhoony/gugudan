@@ -13,7 +13,7 @@ export async function GET(request: Request, context: Ctx) {
   if (playerId) {
     await touchPlayer(code, playerId);
   }
-  const room = await getPublicRoom(code);
+  const room = await getPublicRoom(code, playerId);
   if (!room) {
     return NextResponse.json({ error: "방을 찾을 수 없습니다." }, { status: 404 });
   }

@@ -7,9 +7,17 @@ import {
   pickResults,
 } from "@/lib/ladder";
 import {
+  KWH_COUNTDOWN_MS,
+  KWH_MAX_MS,
+  KWH_TARGET,
+  rankByTarget,
+  readingAt,
+} from "@/lib/kwh";
+import {
   EVENT_FULL,
   PLAYER_STALE_MS,
   type GameMode,
+  type KwhState,
   type LadderState,
   type MashState,
   type MoleState,
@@ -27,6 +35,7 @@ const MODES: GameMode[] = [
   "ladder",
   "mash",
   "mole",
+  "kwh",
 ];
 const MASH_COUNTDOWN_MS = 3000;
 const MASH_PLAY_MS = 5000;
@@ -85,6 +94,16 @@ function emptyMole(): MoleState {
   };
 }
 
+function emptyKwh(): KwhState {
+  return {
+    phase: "idle",
+    target: KWH_TARGET,
+    endsAt: null,
+    startedAt: null,
+    stops: {},
+  };
+}
+
 export function emptyState(title: string): RoomState {
   return {
     title,
@@ -100,6 +119,7 @@ export function emptyState(title: string): RoomState {
     ladder: emptyLadder(),
     mash: emptyMash(),
     mole: emptyMole(),
+    kwh: emptyKwh(),
   };
 }
 
@@ -113,6 +133,7 @@ function normalizeState(raw: RoomState): RoomState {
     ladder: { ...base.ladder, ...(raw.ladder ?? {}) },
     mash: { ...base.mash, ...(raw.mash ?? {}) },
     mole: { ...base.mole, ...(raw.mole ?? {}) },
+    kwh: { ...base.kwh, ...(raw.kwh ?? {}) },
     players: Array.isArray(raw.players) ? raw.players : [],
     mode: MODES.includes(raw.mode) ? raw.mode : "lobby",
   };
@@ -169,11 +190,50 @@ export async function createRoom(title: string): Promise<{
   throw new Error("방 코드를 만들지 못했습니다. 다시 시도해 주세요.");
 }
 
-export async function getPublicRoom(code: string): Promise<PublicRoom | null> {
+function maskKwhForViewer(
+  state: RoomState,
+  viewerId?: string | null,
+): RoomState {
+  if (state.mode !== "kwh" || state.kwh.phase !== "play") return state;
+  const stops: Record<string, number> = {};
+  for (const [pid, value] of Object.entries(state.kwh.stops)) {
+    stops[pid] = viewerId && pid === viewerId ? value : -1;
+  }
+  return { ...state, kwh: { ...state.kwh, stops } };
+}
+
+function timedSignature(state: RoomState): string {
+  return JSON.stringify({
+    mode: state.mode,
+    mash: state.mash,
+    mole: {
+      phase: state.mole.phase,
+      endsAt: state.mole.endsAt,
+      activeSlot: state.mole.activeSlot,
+      activeUntil: state.mole.activeUntil,
+      hits: state.mole.hits,
+    },
+    ladder: {
+      phase: state.ladder.phase,
+      runEndsAt: state.ladder.runEndsAt,
+    },
+    kwh: state.kwh,
+  });
+}
+
+export async function getPublicRoom(
+  code: string,
+  viewerId?: string | null,
+): Promise<PublicRoom | null> {
   const row = await getRow(code);
   if (!row) return null;
-  let state = prunePlayers(parseState(row.state));
-  state = advanceTimedState(state);
+  const prev = prunePlayers(parseState(row.state));
+  const next = advanceTimedState(prev);
+  let state = next;
+  if (timedSignature(prev) !== timedSignature(next)) {
+    state = await saveState(row.code, next);
+  }
+  state = maskKwhForViewer(state, viewerId);
   const updatedAt =
     typeof row.updated_at === "string"
       ? row.updated_at
@@ -256,7 +316,28 @@ function resetModes(state: RoomState, mode: GameMode): RoomState {
     ladder: emptyLadder(),
     mash: emptyMash(),
     mole: emptyMole(),
+    kwh: emptyKwh(),
   };
+}
+
+function finalizeKwh(state: RoomState): RoomState {
+  const ranked = rankByTarget(state.kwh.stops, state.kwh.target);
+  let next: RoomState = {
+    ...state,
+    kwh: {
+      ...state.kwh,
+      phase: "reveal",
+      endsAt: null,
+    },
+  };
+  if (ranked[0]) {
+    next = bumpScore(next, ranked[0].playerId, 2);
+    if (ranked[0].badge === "perfect") {
+      next = bumpScore(next, ranked[0].playerId, 1);
+    }
+  }
+  if (ranked[1]) next = bumpScore(next, ranked[1].playerId, 1);
+  return next;
 }
 
 function awardTopTapScores(
@@ -351,6 +432,44 @@ function advanceTimedState(state: RoomState): RoomState {
       next = spawnMole(next);
     }
     return next;
+  }
+
+  if (state.mode === "kwh") {
+    if (
+      state.kwh.phase === "countdown" &&
+      state.kwh.endsAt &&
+      now() >= state.kwh.endsAt
+    ) {
+      const start = now();
+      return {
+        ...state,
+        kwh: {
+          ...state.kwh,
+          phase: "play",
+          startedAt: start,
+          endsAt: start + KWH_MAX_MS,
+          stops: {},
+        },
+      };
+    }
+    if (state.kwh.phase === "play") {
+      let next = state;
+      // 미정지 선수 자동 마감
+      if (state.kwh.endsAt && now() >= state.kwh.endsAt && state.kwh.startedAt) {
+        const stops = { ...state.kwh.stops };
+        const auto = readingAt(state.kwh.startedAt, state.kwh.endsAt);
+        for (const p of state.players) {
+          if (stops[p.id] == null) stops[p.id] = auto;
+        }
+        next = { ...state, kwh: { ...state.kwh, stops } };
+        return finalizeKwh(next);
+      }
+      const allIn =
+        state.players.length > 0 &&
+        state.players.every((p) => state.kwh.stops[p.id] != null);
+      if (allIn) return finalizeKwh(state);
+      return next;
+    }
   }
 
   return state;
@@ -547,6 +666,48 @@ export async function hostAction(
       state = { ...state, mole: emptyMole() };
       break;
     }
+    case "kwhStart": {
+      if (state.players.length < 1) {
+        throw new BadRequestError("선수가 필요합니다.");
+      }
+      state = {
+        ...state,
+        mode: "kwh",
+        kwh: {
+          phase: "countdown",
+          target: KWH_TARGET,
+          endsAt: now() + KWH_COUNTDOWN_MS,
+          startedAt: null,
+          stops: {},
+        },
+      };
+      break;
+    }
+    case "kwhReveal": {
+      if (state.kwh.phase !== "play") {
+        throw new BadRequestError("계측 중이 아닙니다.");
+      }
+      if (Object.keys(state.kwh.stops).length < 1) {
+        throw new BadRequestError("아직 STOP한 선수가 없습니다.");
+      }
+      // 미정지 선수는 현재 전력으로 강제 마감
+      const stops = { ...state.kwh.stops };
+      if (state.kwh.startedAt) {
+        const cur = readingAt(state.kwh.startedAt);
+        for (const p of state.players) {
+          if (stops[p.id] == null) stops[p.id] = cur;
+        }
+      }
+      state = finalizeKwh({
+        ...state,
+        kwh: { ...state.kwh, stops },
+      });
+      break;
+    }
+    case "kwhReset": {
+      state = { ...state, kwh: emptyKwh() };
+      break;
+    }
     case "kick": {
       const playerId = String(payload.playerId ?? "");
       state = {
@@ -691,6 +852,31 @@ export async function playAction(
           activeUntil: null,
         },
       });
+      break;
+    }
+    case "kwhStop": {
+      state = advanceTimedState(state);
+      if (state.mode !== "kwh" || state.kwh.phase !== "play") {
+        throw new BadRequestError("지금은 차단할 수 없습니다.");
+      }
+      if (!state.kwh.startedAt) {
+        throw new BadRequestError("계측이 시작되지 않았습니다.");
+      }
+      if (state.kwh.stops[playerId] != null) {
+        throw new BadRequestError("이미 STOP 했습니다.");
+      }
+      const value = readingAt(state.kwh.startedAt);
+      state = {
+        ...state,
+        kwh: {
+          ...state.kwh,
+          stops: { ...state.kwh.stops, [playerId]: value },
+        },
+      };
+      const allIn =
+        state.players.length > 0 &&
+        state.players.every((p) => state.kwh.stops[p.id] != null);
+      if (allIn) state = finalizeKwh(state);
       break;
     }
     default:

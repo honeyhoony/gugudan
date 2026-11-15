@@ -4,7 +4,8 @@ export type GameMode =
   | "treasure"
   | "ladder"
   | "mash"
-  | "mole";
+  | "mole"
+  | "kwh";
 
 export type Player = {
   id: string;
@@ -19,6 +20,7 @@ export type TreasurePhase = "idle" | "clue" | "reveal";
 export type LadderPhase = "idle" | "picking" | "running" | "result";
 export type MashPhase = "idle" | "countdown" | "play" | "result";
 export type MolePhase = "idle" | "play" | "result";
+export type KwhPhase = "idle" | "countdown" | "play" | "reveal";
 
 export type OxState = {
   phase: OxPhase;
@@ -59,6 +61,17 @@ export type MoleState = {
   slots: number;
 };
 
+export type KwhState = {
+  phase: KwhPhase;
+  target: number;
+  /** countdown ends / play auto-end */
+  endsAt: number | null;
+  /** play started (meter zero) */
+  startedAt: number | null;
+  /** playerId -> kWh reading when stopped */
+  stops: Record<string, number>;
+};
+
 export type RoomState = {
   title: string;
   mode: GameMode;
@@ -68,6 +81,7 @@ export type RoomState = {
   ladder: LadderState;
   mash: MashState;
   mole: MoleState;
+  kwh: KwhState;
 };
 
 export type PublicRoom = {
