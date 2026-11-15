@@ -4,6 +4,9 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { JoinQr } from "@/components/JoinQr";
 import { ScoreList } from "@/components/ScoreList";
+import { SolarLadder } from "@/components/SolarLadder";
+import { TreasureMap } from "@/components/TreasureMap";
+import { TREASURE_SPOTS } from "@/lib/content";
 import { hostCommand, hostStorageKey } from "@/lib/client";
 import { useRoom } from "@/hooks/useRoom";
 import type { GameMode, RoomState } from "@/lib/types";
@@ -38,16 +41,6 @@ export default function HostPage() {
     });
   }
 
-  const winner = useMemo(() => {
-    if (!state?.random.winnerId) return null;
-    return state.players.find((p) => p.id === state.random.winnerId) ?? null;
-  }, [state]);
-
-  const reactionWinner = useMemo(() => {
-    if (!state?.reaction.winnerId) return null;
-    return state.players.find((p) => p.id === state.reaction.winnerId) ?? null;
-  }, [state]);
-
   const oxCounts = useMemo(() => {
     if (!state) return { o: 0, x: 0, total: 0 };
     const values = Object.values(state.ox.answers);
@@ -58,18 +51,23 @@ export default function HostPage() {
     };
   }, [state]);
 
-  if (!ready) {
-    return <Centered>화면을 준비하는 중…</Centered>;
-  }
-  if (error || !state) {
-    return <Centered>{error || "방을 찾을 수 없습니다."}</Centered>;
-  }
+  const ladderTop = useMemo(() => {
+    if (!state) return [];
+    return Array.from({ length: state.ladder.laneCount }, (_, i) => {
+      const entry = Object.entries(state.ladder.picks).find(([, lane]) => lane === i);
+      if (!entry) return `${i + 1}번`;
+      return state.players.find((p) => p.id === entry[0])?.name ?? `${i + 1}번`;
+    });
+  }, [state]);
+
+  if (!ready) return <Centered>화면을 준비하는 중…</Centered>;
+  if (error || !state) return <Centered>{error || "방을 찾을 수 없습니다."}</Centered>;
   if (!hostKey) {
     return (
       <Centered>
         진행자 권한이 없는 화면입니다.
         <br />
-        홈에서 방을 다시 만들어 주세요.
+        홈에서 대회장을 다시 열어 주세요.
       </Centered>
     );
   }
@@ -79,11 +77,11 @@ export default function HostPage() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="brand-display text-2xl text-[var(--gold)]">한판</p>
-          <h1 className="mt-1 text-3xl font-bold md:text-4xl">{state.title}</h1>
+          <h1 className="mt-1 text-2xl font-bold md:text-4xl">{state.title}</h1>
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right">
-            <p className="text-sm text-white/50">방 코드</p>
+            <p className="text-sm text-white/50">입장 코드</p>
             <p className="brand-display text-4xl tracking-[0.2em] text-white">
               {code}
             </p>
@@ -115,32 +113,30 @@ export default function HostPage() {
                 setCustomA={setCustomA}
                 pending={pending}
                 onStart={() =>
-                  run("oxStart", {
-                    question: customQ,
-                    answer: customA,
-                  })
+                  run("oxStart", { question: customQ, answer: customA })
                 }
                 onRandom={() => run("oxStart", {})}
                 onReveal={() => run("oxReveal")}
                 onReset={() => run("oxReset")}
               />
             ) : null}
-            {state.mode === "random" ? (
-              <RandomHostView
+            {state.mode === "treasure" ? (
+              <TreasureHostView
                 state={state}
-                winner={winner}
                 pending={pending}
-                onSpin={() => run("randomSpin")}
-                onClear={() => run("randomClear")}
+                onStart={() => run("treasureStart", {})}
+                onReveal={() => run("treasureReveal")}
+                onReset={() => run("treasureReset")}
               />
             ) : null}
-            {state.mode === "reaction" ? (
-              <ReactionHostView
+            {state.mode === "ladder" ? (
+              <LadderHostView
                 state={state}
-                winner={reactionWinner}
+                topLabels={ladderTop}
                 pending={pending}
-                onArm={() => run("reactionArm")}
-                onReset={() => run("reactionReset")}
+                onOpen={() => run("ladderOpen", {})}
+                onRun={() => run("ladderRun")}
+                onReset={() => run("ladderReset")}
               />
             ) : null}
           </div>
@@ -161,16 +157,7 @@ export default function HostPage() {
             <JoinQr code={code} />
             <div className="my-4 h-px bg-white/10" />
           </div>
-          <ScoreList
-            players={state.players}
-            highlightId={
-              state.mode === "random"
-                ? state.random.winnerId
-                : state.mode === "reaction"
-                  ? state.reaction.winnerId
-                  : null
-            }
-          />
+          <ScoreList players={state.players} />
         </aside>
       </div>
 
@@ -200,9 +187,9 @@ function ModeTabs({
 }) {
   const items: { id: GameMode; label: string }[] = [
     { id: "lobby", label: "대기실" },
-    { id: "ox", label: "O/X 경기" },
-    { id: "random", label: "랜덤 선수" },
-    { id: "reaction", label: "순발력" },
+    { id: "ox", label: "O/X" },
+    { id: "treasure", label: "오봉산 보물" },
+    { id: "ladder", label: "태양광 사다리" },
   ];
   return (
     <div className="flex flex-wrap gap-2">
@@ -229,13 +216,11 @@ function LobbyView({ count, code }: { count: number; code: string }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center text-center">
       <p className="text-white/60">선수 입장 중 · 개회 대기</p>
-      <p className="brand-display mt-3 text-7xl text-white md:text-8xl">
-        {count}
-      </p>
+      <p className="brand-display mt-3 text-7xl text-white md:text-8xl">{count}</p>
       <p className="mt-2 text-xl text-white/70">명 등록</p>
       <p className="mt-8 max-w-md text-white/55">
-        휴대폰에서 <span className="text-[var(--gold)]">{code}</span> 입력, 또는
-        QR 스캔 후 닉네임으로 선수 등록하세요.
+        휴대폰에서 <span className="text-[var(--gold)]">{code}</span> 입력 후
+        선수 등록 · O/X · 오봉산 보물찾기 · 태양광 사다리
       </p>
     </div>
   );
@@ -273,14 +258,14 @@ function OxHostView({
         <div>
           <h2 className="brand-display text-4xl md:text-5xl">O / X 경기</h2>
           <p className="mt-2 text-white/60">
-            문제를 내면 선수 휴대폰에 O/X 버튼이 뜹니다.
+            가볍고 신박한 에너지·일상 문제. 단체로 빠르게!
           </p>
         </div>
         <div className="grid gap-3 md:grid-cols-[1fr_auto]">
           <input
             value={customQ}
             onChange={(e) => setCustomQ(e.target.value)}
-            placeholder="직접 문제 입력 (비우면 랜덤)"
+            placeholder="직접 문제 (비우면 랜덤 출제)"
             className="rounded-xl border border-white/15 bg-black/25 px-4 py-3 outline-none focus:ring-2 focus:ring-[var(--gold)]"
             maxLength={80}
           />
@@ -302,20 +287,10 @@ function OxHostView({
           </div>
         </div>
         <div className="flex flex-wrap gap-3">
-          <button
-            type="button"
-            disabled={pending}
-            onClick={onStart}
-            className="btn btn-primary"
-          >
+          <button type="button" disabled={pending} onClick={onStart} className="btn btn-primary">
             이 문제로 시작
           </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={onRandom}
-            className="btn btn-ghost"
-          >
+          <button type="button" disabled={pending} onClick={onRandom} className="btn btn-ghost">
             랜덤 문제
           </button>
         </div>
@@ -329,7 +304,6 @@ function OxHostView({
       <h2 className="brand-display mt-3 text-3xl leading-snug md:text-5xl">
         {ox.question}
       </h2>
-
       <div className="mt-10 grid flex-1 grid-cols-2 gap-4">
         <div className="rounded-3xl bg-teal-500/20 p-6 text-center">
           <p className="brand-display text-6xl text-teal-200">O</p>
@@ -340,29 +314,18 @@ function OxHostView({
           <p className="mt-3 text-4xl font-bold tabular-nums">{counts.x}</p>
         </div>
       </div>
-
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <p className="text-white/55">응답 {counts.total}/{state.players.length}</p>
+        <p className="text-white/55">
+          응답 {counts.total}/{state.players.length}
+        </p>
         {ox.phase === "question" ? (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={onReveal}
-            className="btn btn-primary"
-          >
+          <button type="button" disabled={pending} onClick={onReveal} className="btn btn-primary">
             정답 공개
           </button>
         ) : (
           <>
-            <p className="brand-display text-3xl text-[var(--gold)]">
-              정답 {ox.answer}
-            </p>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={onReset}
-              className="btn btn-ghost"
-            >
+            <p className="brand-display text-3xl text-[var(--gold)]">정답 {ox.answer}</p>
+            <button type="button" disabled={pending} onClick={onReset} className="btn btn-ghost">
               다음 문제
             </button>
           </>
@@ -372,113 +335,168 @@ function OxHostView({
   );
 }
 
-function RandomHostView({
+function TreasureHostView({
   state,
-  winner,
   pending,
-  onSpin,
-  onClear,
+  onStart,
+  onReveal,
+  onReset,
 }: {
   state: RoomState;
-  winner: { name: string } | null | undefined;
   pending: boolean;
-  onSpin: () => void;
-  onClear: () => void;
+  onStart: () => void;
+  onReveal: () => void;
+  onReset: () => void;
 }) {
-  const spinning = state.random.phase === "spinning";
-  const done = state.random.phase === "result";
+  const t = state.treasure;
+  const spotLabel =
+    TREASURE_SPOTS.find((s) => s.id === t.spotId)?.label ?? t.spotId;
+
+  if (t.phase === "idle") {
+    return (
+      <div className="flex flex-1 flex-col justify-center gap-6">
+        <div>
+          <h2 className="brand-display text-4xl md:text-5xl">오봉산 보물찾기</h2>
+          <p className="mt-2 text-white/60">
+            힌트를 듣고 휴대폰에서 보물 위치를 고르세요.
+          </p>
+        </div>
+        <TreasureMap />
+        <button type="button" disabled={pending} onClick={onStart} className="btn btn-primary w-fit">
+          힌트 공개 · 시작
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center text-center">
-      <h2 className="brand-display text-4xl md:text-5xl">랜덤 선수</h2>
-      <p className="mt-2 text-white/60">등록된 선수 중에서 한 명을 뽑습니다.</p>
-
-      <div
-        className={`mt-10 flex h-56 w-56 items-center justify-center rounded-full border-4 border-[var(--gold)]/50 bg-black/30 ${
-          spinning ? "anim-spin" : ""
-        }`}
-      >
-        <p className="brand-display px-4 text-3xl text-[var(--gold)] md:text-4xl">
-          {spinning ? "두근…" : done && winner ? winner.name : "?"}
+    <div className="flex flex-1 flex-col gap-4">
+      <p className="text-sm text-white/50">보물 힌트</p>
+      <h2 className="brand-display text-2xl leading-snug md:text-4xl">{t.clue}</h2>
+      <TreasureMap
+        guesses={t.guesses}
+        highlightId={t.phase === "reveal" ? t.spotId : undefined}
+        reveal={t.phase === "reveal"}
+      />
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-white/55">
+          선택 {Object.keys(t.guesses).length}/{state.players.length}
         </p>
-      </div>
-
-      <div className="mt-8 flex gap-3">
-        <button
-          type="button"
-          disabled={pending || spinning || state.players.length < 1}
-          onClick={onSpin}
-          className="btn btn-primary"
-        >
-          뽑기 시작
-        </button>
-        {done ? (
-          <button type="button" disabled={pending} onClick={onClear} className="btn btn-ghost">
-            다시
+        {t.phase === "clue" ? (
+          <button type="button" disabled={pending} onClick={onReveal} className="btn btn-primary">
+            보물 공개
           </button>
-        ) : null}
+        ) : (
+          <>
+            <p className="brand-display text-2xl text-[var(--gold)]">
+              보물 위치: {spotLabel}
+            </p>
+            <button type="button" disabled={pending} onClick={onReset} className="btn btn-ghost">
+              다음 힌트
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
 }
 
-function ReactionHostView({
+function LadderHostView({
   state,
-  winner,
+  topLabels,
   pending,
-  onArm,
+  onOpen,
+  onRun,
   onReset,
 }: {
   state: RoomState;
-  winner: { name: string } | null | undefined;
+  topLabels: string[];
   pending: boolean;
-  onArm: () => void;
+  onOpen: () => void;
+  onRun: () => void;
   onReset: () => void;
 }) {
-  const phase = state.reaction.phase;
+  const L = state.ladder;
+
+  if (L.phase === "idle") {
+    return (
+      <div className="flex flex-1 flex-col justify-center gap-5">
+        <div>
+          <h2 className="brand-display text-4xl md:text-5xl">태양광 사다리</h2>
+          <p className="mt-2 text-white/60">
+            패널 모양 사다리로 결과(미션·보너스)를 뽑습니다.
+          </p>
+        </div>
+        <SolarLadder
+          laneCount={6}
+          bridges={[]}
+          topLabels={Array.from({ length: 6 }, (_, i) => `${i + 1}`)}
+          bottomLabels={Array.from({ length: 6 }, () => "?")}
+        />
+        <button
+          type="button"
+          disabled={pending || state.players.length < 2}
+          onClick={onOpen}
+          className="btn btn-primary w-fit"
+        >
+          레인 선택 열기
+        </button>
+      </div>
+    );
+  }
+
+  const showBottom =
+    L.phase === "result" || L.phase === "running"
+      ? L.results
+      : Array.from({ length: L.laneCount }, () => "?");
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center text-center">
-      <h2 className="brand-display text-4xl md:text-5xl">순발력 경기</h2>
-      <p className="mt-2 text-white/60">신호가 켜지면 휴대폰을 가장 빨리!</p>
-
-      <div className="mt-10 flex min-h-48 w-full max-w-xl items-center justify-center rounded-3xl bg-black/30 p-8">
-        {phase === "idle" ? (
-          <p className="text-2xl text-white/50">준비되면 시작하세요</p>
-        ) : null}
-        {phase === "wait" ? (
-          <p className="brand-display text-5xl text-white/40">기다리세요…</p>
-        ) : null}
-        {phase === "go" ? (
-          <p className="brand-display anim-go text-7xl text-[var(--gold)]">지금!</p>
-        ) : null}
-        {phase === "result" ? (
-          <div className="anim-rise">
-            <p className="text-white/60">1등</p>
-            <p className="brand-display mt-2 text-5xl text-[var(--gold)]">
-              {winner?.name ?? "?"}
+    <div className="flex flex-1 flex-col gap-4">
+      <SolarLadder
+        laneCount={L.laneCount}
+        bridges={L.bridges}
+        topLabels={topLabels}
+        bottomLabels={showBottom}
+        animate={L.phase === "running"}
+      />
+      <div className="flex flex-wrap gap-3">
+        {L.phase === "picking" ? (
+          <>
+            <p className="self-center text-white/55">
+              선택 {Object.keys(L.picks).length}/{L.laneCount} 레인
             </p>
-          </div>
+            <button type="button" disabled={pending} onClick={onRun} className="btn btn-primary">
+              사다리 타기!
+            </button>
+          </>
         ) : null}
-      </div>
-
-      <div className="mt-8 flex gap-3">
-        {(phase === "idle" || phase === "result") && (
-          <button
-            type="button"
-            disabled={pending || state.players.length < 1}
-            onClick={onArm}
-            className="btn btn-primary"
-          >
-            {phase === "result" ? "한 판 더" : "시작"}
-          </button>
-        )}
-        {phase !== "idle" ? (
+        {L.phase === "running" ? (
+          <p className="brand-display text-2xl text-[var(--gold)]">전류 흐르는 중…</p>
+        ) : null}
+        {(L.phase === "result" || L.phase === "picking" || L.phase === "running") && (
           <button type="button" disabled={pending} onClick={onReset} className="btn btn-ghost">
             리셋
           </button>
-        ) : null}
+        )}
       </div>
+      {L.phase === "result" ? (
+        <ul className="grid gap-2 md:grid-cols-2">
+          {Object.entries(L.picks).map(([pid, lane]) => {
+            const name = state.players.find((p) => p.id === pid)?.name ?? "?";
+            const end = L.mapping[lane] ?? lane;
+            return (
+              <li
+                key={pid}
+                className="rounded-xl bg-white/5 px-3 py-2 text-sm"
+              >
+                <span className="font-semibold">{name}</span>
+                <span className="text-white/40"> → </span>
+                <span className="text-[var(--gold)]">{L.results[end]}</span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
     </div>
   );
 }

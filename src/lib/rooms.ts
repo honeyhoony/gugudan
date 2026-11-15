@@ -1,15 +1,24 @@
 import { randomBytes } from "node:crypto";
 import { sql } from "@/lib/db";
-import { pickOxQuestion } from "@/lib/questions";
+import { pickOxQuestion, pickTreasureClue, LADDER_RESULTS } from "@/lib/content";
+import {
+  buildMapping,
+  generateBridges,
+  pickResults,
+} from "@/lib/ladder";
 import {
   EVENT_FULL,
   PLAYER_STALE_MS,
+  type GameMode,
+  type LadderState,
   type Player,
   type PublicRoom,
   type RoomState,
+  type TreasureState,
 } from "@/lib/types";
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const MODES: GameMode[] = ["lobby", "ox", "treasure", "ladder"];
 
 function now() {
   return Date.now();
@@ -32,6 +41,22 @@ export function createPlayerId(): string {
   return randomBytes(12).toString("hex");
 }
 
+function emptyTreasure(): TreasureState {
+  return { phase: "idle", clue: "", spotId: "", guesses: {} };
+}
+
+function emptyLadder(): LadderState {
+  return {
+    phase: "idle",
+    laneCount: 6,
+    picks: {},
+    bridges: [],
+    results: [],
+    mapping: {},
+    runEndsAt: null,
+  };
+}
+
 export function emptyState(title: string): RoomState {
   return {
     title,
@@ -43,17 +68,21 @@ export function emptyState(title: string): RoomState {
       answer: "O",
       answers: {},
     },
-    random: {
-      phase: "idle",
-      winnerId: null,
-      spinEndsAt: null,
-    },
-    reaction: {
-      phase: "idle",
-      goAt: null,
-      taps: {},
-      winnerId: null,
-    },
+    treasure: emptyTreasure(),
+    ladder: emptyLadder(),
+  };
+}
+
+function normalizeState(raw: RoomState): RoomState {
+  const base = emptyState(raw.title || EVENT_FULL);
+  return {
+    ...base,
+    ...raw,
+    ox: { ...base.ox, ...(raw.ox ?? {}) },
+    treasure: { ...base.treasure, ...(raw.treasure ?? {}) },
+    ladder: { ...base.ladder, ...(raw.ladder ?? {}) },
+    players: Array.isArray(raw.players) ? raw.players : [],
+    mode: MODES.includes(raw.mode) ? raw.mode : "lobby",
   };
 }
 
@@ -73,8 +102,8 @@ type RoomRow = {
 };
 
 function parseState(raw: RoomState | string): RoomState {
-  if (typeof raw === "string") return JSON.parse(raw) as RoomState;
-  return raw;
+  const parsed = typeof raw === "string" ? (JSON.parse(raw) as RoomState) : raw;
+  return normalizeState(parsed);
 }
 
 async function getRow(code: string): Promise<RoomRow | null> {
@@ -186,35 +215,35 @@ function bumpScore(state: RoomState, playerId: string, delta: number): RoomState
   };
 }
 
+function resetModes(state: RoomState, mode: GameMode): RoomState {
+  return {
+    ...state,
+    mode,
+    ox: { phase: "idle", question: "", answer: "O", answers: {} },
+    treasure: emptyTreasure(),
+    ladder: emptyLadder(),
+  };
+}
+
 function advanceTimedState(state: RoomState): RoomState {
   if (
-    state.mode === "random" &&
-    state.random.phase === "spinning" &&
-    state.random.spinEndsAt &&
-    now() >= state.random.spinEndsAt
+    state.mode === "ladder" &&
+    state.ladder.phase === "running" &&
+    state.ladder.runEndsAt &&
+    now() >= state.ladder.runEndsAt
   ) {
-    return {
+    let next: RoomState = {
       ...state,
-      random: {
-        ...state.random,
-        phase: "result",
-        spinEndsAt: null,
-      },
+      ladder: { ...state.ladder, phase: "result", runEndsAt: null },
     };
-  }
-  if (
-    state.mode === "reaction" &&
-    state.reaction.phase === "wait" &&
-    state.reaction.goAt &&
-    now() >= state.reaction.goAt
-  ) {
-    return {
-      ...state,
-      reaction: {
-        ...state.reaction,
-        phase: "go",
-      },
-    };
+    // 보너스 결과 점수
+    for (const [pid, lane] of Object.entries(state.ladder.picks)) {
+      const end = state.ladder.mapping[lane];
+      if (end == null) continue;
+      const label = state.ladder.results[end] ?? "";
+      if (label.includes("+1")) next = bumpScore(next, pid, 1);
+    }
+    return next;
   }
   return state;
 }
@@ -235,17 +264,11 @@ export async function hostAction(
       break;
     }
     case "setMode": {
-      const mode = String(payload.mode);
-      if (!["lobby", "ox", "random", "reaction"].includes(mode)) {
+      const mode = String(payload.mode) as GameMode;
+      if (!MODES.includes(mode)) {
         throw new BadRequestError("알 수 없는 모드입니다.");
       }
-      state = {
-        ...state,
-        mode: mode as RoomState["mode"],
-        ox: { phase: "idle", question: "", answer: "O", answers: {} },
-        random: { phase: "idle", winnerId: null, spinEndsAt: null },
-        reaction: { phase: "idle", goAt: null, taps: {}, winnerId: null },
-      };
+      state = resetModes(state, mode);
       break;
     }
     case "oxStart": {
@@ -291,49 +314,88 @@ export async function hostAction(
       };
       break;
     }
-    case "randomSpin": {
-      if (state.players.length < 1) {
-        throw new BadRequestError("참가자가 없습니다.");
+    case "treasureStart": {
+      const custom = String(payload.clue ?? "").trim();
+      const spotId = String(payload.spotId ?? "").trim();
+      const picked =
+        custom.length > 0 && spotId
+          ? { clue: custom.slice(0, 100), spotId }
+          : pickTreasureClue();
+      state = {
+        ...state,
+        mode: "treasure",
+        treasure: {
+          phase: "clue",
+          clue: picked.clue,
+          spotId: picked.spotId,
+          guesses: {},
+        },
+      };
+      break;
+    }
+    case "treasureReveal": {
+      if (state.treasure.phase !== "clue") {
+        throw new BadRequestError("진행 중인 보물찾기가 없습니다.");
       }
-      const winner =
-        state.players[Math.floor(Math.random() * state.players.length)]!;
+      let next: RoomState = {
+        ...state,
+        treasure: { ...state.treasure, phase: "reveal" },
+      };
+      for (const [pid, guess] of Object.entries(state.treasure.guesses)) {
+        if (guess === state.treasure.spotId) next = bumpScore(next, pid, 1);
+      }
+      state = next;
+      break;
+    }
+    case "treasureReset": {
+      state = { ...state, treasure: emptyTreasure() };
+      break;
+    }
+    case "ladderOpen": {
+      if (state.players.length < 2) {
+        throw new BadRequestError("선수가 2명 이상 필요합니다.");
+      }
+      const laneCount = Math.min(
+        8,
+        Math.max(2, Number(payload.laneCount) || Math.min(6, state.players.length)),
+      );
       state = {
         ...state,
-        mode: "random",
-        random: {
-          phase: "spinning",
-          winnerId: winner.id,
-          spinEndsAt: now() + 3200,
+        mode: "ladder",
+        ladder: {
+          ...emptyLadder(),
+          phase: "picking",
+          laneCount,
         },
       };
       break;
     }
-    case "randomClear": {
+    case "ladderRun": {
+      if (state.ladder.phase !== "picking") {
+        throw new BadRequestError("먼저 레인 선택을 열어 주세요.");
+      }
+      const picks = Object.keys(state.ladder.picks).length;
+      if (picks < 1) {
+        throw new BadRequestError("레인에 선수가 없습니다.");
+      }
+      const bridges = generateBridges(state.ladder.laneCount, 11);
+      const mapping = buildMapping(state.ladder.laneCount, bridges);
+      const results = pickResults(state.ladder.laneCount, LADDER_RESULTS);
       state = {
         ...state,
-        random: { phase: "idle", winnerId: null, spinEndsAt: null },
-      };
-      break;
-    }
-    case "reactionArm": {
-      const delay = 1800 + Math.floor(Math.random() * 3500);
-      state = {
-        ...state,
-        mode: "reaction",
-        reaction: {
-          phase: "wait",
-          goAt: now() + delay,
-          taps: {},
-          winnerId: null,
+        ladder: {
+          ...state.ladder,
+          phase: "running",
+          bridges,
+          mapping,
+          results,
+          runEndsAt: now() + 3800,
         },
       };
       break;
     }
-    case "reactionReset": {
-      state = {
-        ...state,
-        reaction: { phase: "idle", goAt: null, taps: {}, winnerId: null },
-      };
+    case "ladderReset": {
+      state = { ...state, ladder: emptyLadder() };
       break;
     }
     case "kick": {
@@ -398,32 +460,48 @@ export async function playAction(
       };
       break;
     }
-    case "reactionTap": {
-      state = advanceTimedState(state);
-      if (state.mode !== "reaction") {
-        throw new BadRequestError("순발력 게임이 아닙니다.");
+    case "treasureGuess": {
+      if (state.mode !== "treasure" || state.treasure.phase !== "clue") {
+        throw new BadRequestError("지금은 고를 수 없습니다.");
       }
-      if (state.reaction.phase === "wait") {
-        // early tap — ignore scoring, keep waiting
-        break;
+      if (state.treasure.guesses[playerId]) {
+        throw new BadRequestError("이미 위치를 골랐습니다.");
       }
-      if (state.reaction.phase !== "go") {
-        throw new BadRequestError("지금은 누를 수 없습니다.");
-      }
-      if (state.reaction.taps[playerId]) break;
-      const tappedAt = now();
-      const taps = { ...state.reaction.taps, [playerId]: tappedAt };
-      const isFirst = !state.reaction.winnerId;
+      const spotId = String(payload.spotId ?? "");
+      if (!spotId) throw new BadRequestError("위치를 골라 주세요.");
       state = {
         ...state,
-        reaction: {
-          ...state.reaction,
-          taps,
-          winnerId: isFirst ? playerId : state.reaction.winnerId,
-          phase: isFirst ? "result" : state.reaction.phase,
+        treasure: {
+          ...state.treasure,
+          guesses: { ...state.treasure.guesses, [playerId]: spotId },
         },
       };
-      if (isFirst) state = bumpScore(state, playerId, 1);
+      break;
+    }
+    case "ladderPick": {
+      if (state.mode !== "ladder" || state.ladder.phase !== "picking") {
+        throw new BadRequestError("지금은 레인을 고를 수 없습니다.");
+      }
+      const lane = Number(payload.lane);
+      if (
+        !Number.isInteger(lane) ||
+        lane < 0 ||
+        lane >= state.ladder.laneCount
+      ) {
+        throw new BadRequestError("잘못된 레인입니다.");
+      }
+      // 이미 다른 선수가 차지한 레인이면 거부
+      const taken = Object.entries(state.ladder.picks).find(
+        ([pid, l]) => l === lane && pid !== playerId,
+      );
+      if (taken) throw new BadRequestError("이미 선택된 레인입니다.");
+      state = {
+        ...state,
+        ladder: {
+          ...state.ladder,
+          picks: { ...state.ladder.picks, [playerId]: lane },
+        },
+      };
       break;
     }
     default:

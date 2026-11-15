@@ -1,4 +1,4 @@
-export type GameMode = "lobby" | "ox" | "random" | "reaction";
+export type GameMode = "lobby" | "ox" | "treasure" | "ladder";
 
 export type Player = {
   id: string;
@@ -9,8 +9,8 @@ export type Player = {
 };
 
 export type OxPhase = "idle" | "question" | "reveal";
-export type RandomPhase = "idle" | "spinning" | "result";
-export type ReactionPhase = "idle" | "wait" | "go" | "result";
+export type TreasurePhase = "idle" | "clue" | "reveal";
+export type LadderPhase = "idle" | "picking" | "running" | "result";
 
 export type OxState = {
   phase: OxPhase;
@@ -19,17 +19,21 @@ export type OxState = {
   answers: Record<string, "O" | "X">;
 };
 
-export type RandomState = {
-  phase: RandomPhase;
-  winnerId: string | null;
-  spinEndsAt: number | null;
+export type TreasureState = {
+  phase: TreasurePhase;
+  clue: string;
+  spotId: string;
+  guesses: Record<string, string>;
 };
 
-export type ReactionState = {
-  phase: ReactionPhase;
-  goAt: number | null;
-  taps: Record<string, number>;
-  winnerId: string | null;
+export type LadderState = {
+  phase: LadderPhase;
+  laneCount: number;
+  picks: Record<string, number>;
+  bridges: boolean[][];
+  results: string[];
+  mapping: Record<number, number>;
+  runEndsAt: number | null;
 };
 
 export type RoomState = {
@@ -37,8 +41,8 @@ export type RoomState = {
   mode: GameMode;
   players: Player[];
   ox: OxState;
-  random: RandomState;
-  reaction: ReactionState;
+  treasure: TreasureState;
+  ladder: LadderState;
 };
 
 export type PublicRoom = {

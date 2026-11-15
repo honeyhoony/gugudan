@@ -17,7 +17,7 @@ const body = Noto_Sans_KR({
 export const metadata: Metadata = {
   title: "한판 | 대구본부 에너지효율부 온라인 체육대회",
   description:
-    "대구본부 에너지효율부 온라인 체육대회 — 큰 화면 진행, 휴대폰 참여 (O/X·랜덤 선수·순발력)",
+    "대구본부 에너지효율부 온라인 체육대회 — O/X, 오봉산 보물찾기, 태양광 사다리",
 };
 
 export const viewport: Viewport = {

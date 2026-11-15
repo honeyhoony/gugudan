@@ -60,7 +60,7 @@ export default function HomePage() {
           <p className="mt-5 max-w-md text-lg leading-relaxed text-white/75 md:text-xl">
             프로젝터는 경기장, 휴대폰은 선수 컨트롤러.
             <br />
-            O/X · 랜덤 선수 · 순발력 경기를 다같이.
+            O/X · 오봉산 보물찾기 · 태양광 사다리.
           </p>
         </div>
 

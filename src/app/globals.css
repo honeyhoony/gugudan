@@ -147,3 +147,17 @@ body {
 .anim-go {
   animation: flash-go 0.45s ease-out both;
 }
+
+@keyframes ladder-glow {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.25);
+  }
+}
+
+.anim-ladder {
+  animation: ladder-glow 0.7s ease-in-out 5;
+}

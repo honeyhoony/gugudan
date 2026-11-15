@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState, useTransition } from "react";
 import { useParams } from "next/navigation";
+import { TREASURE_SPOTS } from "@/lib/content";
 import {
   joinRoom,
   playCommand,
@@ -36,6 +37,10 @@ export default function PlayPage() {
   }, [code]);
 
   const myAnswer = player && state ? state.ox.answers[player.id] : undefined;
+  const myGuess =
+    player && state ? state.treasure.guesses[player.id] : undefined;
+  const myLane =
+    player && state ? state.ladder.picks[player.id] : undefined;
   const me = useMemo(
     () => state?.players.find((p) => p.id === player?.id) ?? null,
     [state, player],
@@ -75,12 +80,9 @@ export default function PlayPage() {
     });
   }
 
-  if (!boot || !ready) {
-    return <Shell>연결 중…</Shell>;
-  }
-  if (error && !state) {
-    return <Shell>{error}</Shell>;
-  }
+  if (!boot || !ready) return <Shell>연결 중…</Shell>;
+  if (error && !state) return <Shell>{error}</Shell>;
+
   if (!player) {
     return (
       <Shell>
@@ -97,11 +99,7 @@ export default function PlayPage() {
               className="w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-lg outline-none focus:ring-2 focus:ring-teal-300"
               autoFocus
             />
-            <button
-              type="submit"
-              disabled={pending}
-              className="btn btn-sea w-full"
-            >
+            <button type="submit" disabled={pending} className="btn btn-sea w-full">
               {pending ? "등록 중…" : "선수 등록"}
             </button>
           </form>
@@ -124,7 +122,9 @@ export default function PlayPage() {
         </div>
         <div className="rounded-full bg-white/10 px-3 py-1 text-sm">
           {player.name}
-          <span className="ml-2 font-bold text-[var(--gold)]">{me?.score ?? 0}</span>
+          <span className="ml-2 font-bold text-[var(--gold)]">
+            {me?.score ?? 0}
+          </span>
         </div>
       </header>
 
@@ -151,37 +151,27 @@ export default function PlayPage() {
           />
         ) : null}
 
-        {state.mode === "random" ? (
-          <div className="flex flex-1 flex-col items-center justify-center text-center">
-            <p className="text-white/60">랜덤 뽑기</p>
-            {state.random.phase === "spinning" ? (
-              <p className="brand-display mt-4 text-4xl text-[var(--gold)]">두근두근</p>
-            ) : null}
-            {state.random.phase === "result" ? (
-              <p className="brand-display mt-4 text-4xl text-[var(--gold)]">
-                {state.players.find((p) => p.id === state.random.winnerId)?.name ??
-                  "?"}
-              </p>
-            ) : null}
-            {state.random.phase === "idle" ? (
-              <p className="mt-4 text-white/50">진행자가 뽑기를 시작합니다</p>
-            ) : null}
-            {state.random.winnerId === player.id &&
-            state.random.phase === "result" ? (
-              <p className="mt-4 text-lg text-teal-200">당신이 뽑혔습니다!</p>
-            ) : null}
-          </div>
+        {state.mode === "treasure" ? (
+          <TreasurePlay
+            phase={state.treasure.phase}
+            clue={state.treasure.clue}
+            spotId={state.treasure.spotId}
+            myGuess={myGuess}
+            pending={pending}
+            onPick={(spotId) => run("treasureGuess", { spotId })}
+          />
         ) : null}
 
-        {state.mode === "reaction" ? (
-          <ReactionPlay
-            phase={state.reaction.phase}
-            isWinner={state.reaction.winnerId === player.id}
-            winnerName={
-              state.players.find((p) => p.id === state.reaction.winnerId)?.name
-            }
+        {state.mode === "ladder" ? (
+          <LadderPlay
+            phase={state.ladder.phase}
+            laneCount={state.ladder.laneCount}
+            picks={state.ladder.picks}
+            myLane={myLane}
+            mapping={state.ladder.mapping}
+            results={state.ladder.results}
             pending={pending}
-            onTap={() => run("reactionTap")}
+            onPick={(lane) => run("ladderPick", { lane })}
           />
         ) : null}
       </section>
@@ -222,7 +212,7 @@ function OxPlay({
   if (phase === "idle") {
     return (
       <div className="flex flex-1 items-center justify-center text-center text-white/55">
-        다음 문제를 기다리는 중
+        다음 O/X 문제를 기다리는 중
       </div>
     );
   }
@@ -231,7 +221,6 @@ function OxPlay({
     <div className="flex flex-1 flex-col">
       <p className="text-sm text-white/50">O / X</p>
       <h2 className="mt-2 text-xl font-bold leading-snug">{question}</h2>
-
       {phase === "question" ? (
         myAnswer ? (
           <div className="mt-10 flex flex-1 flex-col items-center justify-center">
@@ -282,61 +271,163 @@ function OxPlay({
   );
 }
 
-function ReactionPlay({
+function TreasurePlay({
   phase,
-  isWinner,
-  winnerName,
+  clue,
+  spotId,
+  myGuess,
   pending,
-  onTap,
+  onPick,
 }: {
   phase: string;
-  isWinner: boolean;
-  winnerName?: string;
+  clue: string;
+  spotId: string;
+  myGuess?: string;
   pending: boolean;
-  onTap: () => void;
+  onPick: (spotId: string) => void;
 }) {
   if (phase === "idle") {
     return (
       <div className="flex flex-1 items-center justify-center text-white/55">
-        순발력 대기
+        오봉산 보물찾기 대기
       </div>
     );
   }
-  if (phase === "wait") {
+
+  const answerLabel =
+    TREASURE_SPOTS.find((s) => s.id === spotId)?.label ?? spotId;
+  const myLabel = TREASURE_SPOTS.find((s) => s.id === myGuess)?.label;
+
+  return (
+    <div className="flex flex-1 flex-col">
+      <p className="text-sm text-white/50">오봉산 보물찾기</p>
+      <h2 className="mt-2 text-lg font-bold leading-snug">{clue}</h2>
+      {phase === "clue" ? (
+        myGuess ? (
+          <div className="mt-10 flex flex-1 flex-col items-center justify-center">
+            <p className="text-white/60">선택 완료</p>
+            <p className="brand-display mt-2 text-4xl text-[var(--gold)]">
+              {myLabel}
+            </p>
+          </div>
+        ) : (
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            {TREASURE_SPOTS.map((spot) => (
+              <button
+                key={spot.id}
+                type="button"
+                disabled={pending}
+                onClick={() => onPick(spot.id)}
+                className="btn btn-ghost min-h-16"
+              >
+                {spot.label}
+              </button>
+            ))}
+          </div>
+        )
+      ) : (
+        <div className="mt-10 flex flex-1 flex-col items-center justify-center text-center">
+          <p className="text-white/60">보물 위치</p>
+          <p className="brand-display mt-2 text-4xl text-[var(--gold)]">
+            {answerLabel}
+          </p>
+          {myGuess ? (
+            <p className="mt-4">
+              내 선택 {myLabel}{" "}
+              {myGuess === spotId ? (
+                <span className="text-teal-200">정답!</span>
+              ) : (
+                <span className="text-orange-200">아쉬워요</span>
+              )}
+            </p>
+          ) : (
+            <p className="mt-4 text-white/50">선택하지 않았습니다</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LadderPlay({
+  phase,
+  laneCount,
+  picks,
+  myLane,
+  mapping,
+  results,
+  pending,
+  onPick,
+}: {
+  phase: string;
+  laneCount: number;
+  picks: Record<string, number>;
+  myLane?: number;
+  mapping: Record<number, number>;
+  results: string[];
+  pending: boolean;
+  onPick: (lane: number) => void;
+}) {
+  if (phase === "idle") {
     return (
-      <button
-        type="button"
-        onClick={onTap}
-        className="flex flex-1 flex-col items-center justify-center rounded-2xl bg-white/5"
-      >
-        <p className="brand-display text-4xl text-white/35">기다리세요</p>
-        <p className="mt-2 text-sm text-white/40">아직 누르면 안 됩니다</p>
-      </button>
+      <div className="flex flex-1 items-center justify-center text-white/55">
+        태양광 사다리 대기
+      </div>
     );
   }
-  if (phase === "go") {
+
+  if (phase === "picking") {
     return (
-      <button
-        type="button"
-        disabled={pending}
-        onClick={onTap}
-        className="btn btn-primary anim-go flex flex-1 brand-display text-5xl"
-      >
-        지금!
-      </button>
+      <div className="flex flex-1 flex-col">
+        <p className="text-sm text-white/50">태양광 패널 레인 선택</p>
+        <p className="mt-1 text-white/70">비어 있는 레인을 고르세요</p>
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          {Array.from({ length: laneCount }, (_, i) => {
+            const takenByOther = Object.entries(picks).some(
+              ([, lane]) => lane === i && myLane !== i,
+            );
+            const mine = myLane === i;
+            return (
+              <button
+                key={i}
+                type="button"
+                disabled={pending || takenByOther}
+                onClick={() => onPick(i)}
+                className={`btn min-h-14 ${
+                  mine ? "btn-primary" : takenByOther ? "btn-ghost opacity-40" : "btn-ghost"
+                }`}
+              >
+                {i + 1}번 패널
+                {mine ? " ✓" : takenByOther ? " (점유)" : ""}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     );
   }
+
+  if (phase === "running") {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center text-center">
+        <p className="brand-display text-4xl text-[var(--gold)]">전류 흐르는 중</p>
+        <p className="mt-2 text-white/55">큰 화면을 보세요</p>
+      </div>
+    );
+  }
+
+  const end = myLane != null ? mapping[myLane] : undefined;
+  const result = end != null ? results[end] : null;
+
   return (
     <div className="flex flex-1 flex-col items-center justify-center text-center">
-      <p className="text-white/60">결과</p>
+      <p className="text-white/60">내 결과</p>
       <p className="brand-display mt-2 text-4xl text-[var(--gold)]">
-        {winnerName ?? "?"}
+        {result ?? "관전"}
       </p>
-      {isWinner ? (
-        <p className="mt-3 text-teal-200">당신이 1등!</p>
-      ) : (
-        <p className="mt-3 text-white/50">다음 기회에</p>
-      )}
+      {myLane != null ? (
+        <p className="mt-3 text-white/50">{myLane + 1}번 패널에서 출발</p>
+      ) : null}
     </div>
   );
 }
