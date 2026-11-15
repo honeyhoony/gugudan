@@ -31,13 +31,15 @@ export default function HostPage() {
       return;
     }
     setMsg(null);
-    startTransition(async () => {
-      try {
-        const next = await hostCommand(code, hostKey, action, payload);
-        setState(next);
-      } catch (err) {
-        setMsg(err instanceof Error ? err.message : "실패");
-      }
+    startTransition(() => {
+      void (async () => {
+        try {
+          const next = await hostCommand(code, hostKey, action, payload);
+          setState(next);
+        } catch (err) {
+          setMsg(err instanceof Error ? err.message : "실패");
+        }
+      })();
     });
   }
 
