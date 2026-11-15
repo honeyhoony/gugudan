@@ -199,9 +199,9 @@ function ModeTabs({
   disabled?: boolean;
 }) {
   const items: { id: GameMode; label: string }[] = [
-    { id: "lobby", label: "대기" },
-    { id: "ox", label: "O/X" },
-    { id: "random", label: "랜덤" },
+    { id: "lobby", label: "대기실" },
+    { id: "ox", label: "O/X 경기" },
+    { id: "random", label: "랜덤 선수" },
     { id: "reaction", label: "순발력" },
   ];
   return (
