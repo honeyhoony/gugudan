@@ -55,3 +55,8 @@ export type HostCreateResponse = {
 
 export const ROOM_TTL_MS = 1000 * 60 * 60 * 6;
 export const PLAYER_STALE_MS = 1000 * 60 * 5;
+
+/** 행사 기본 표기 */
+export const EVENT_ORG = "대구본부 에너지효율부";
+export const EVENT_NAME = "온라인 체육대회";
+export const EVENT_FULL = `${EVENT_ORG} ${EVENT_NAME}`;

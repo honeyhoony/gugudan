@@ -3,10 +3,11 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useState, useTransition } from "react";
 import { createRoom, hostStorageKey } from "@/lib/client";
+import { EVENT_FULL, EVENT_ORG } from "@/lib/types";
 
 export default function HomePage() {
   const router = useRouter();
-  const [title, setTitle] = useState("에너지효율부 온라인 체육대회");
+  const [title, setTitle] = useState(EVENT_FULL);
   const [joinCode, setJoinCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -42,7 +43,7 @@ export default function HomePage() {
           한판
         </p>
         <p className="text-right text-sm text-white/55 md:text-base">
-          대구본부 에너지효율부
+          {EVENT_ORG}
         </p>
       </header>
 
@@ -73,7 +74,7 @@ export default function HomePage() {
               onChange={(e) => setTitle(e.target.value)}
               className="mt-2 w-full rounded-xl border border-white/15 bg-black/25 px-4 py-3 outline-none ring-[var(--gold)] focus:ring-2"
               maxLength={40}
-              placeholder="예: 에너지효율부 온라인 체육대회"
+              placeholder={EVENT_FULL}
             />
             <button
               type="submit"

@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { sql } from "@/lib/db";
 import { pickOxQuestion } from "@/lib/questions";
 import {
+  EVENT_FULL,
   PLAYER_STALE_MS,
   type Player,
   type PublicRoom,
@@ -91,9 +92,7 @@ export async function createRoom(title: string): Promise<{
 }> {
   await cleanupOldRooms();
   const hostKey = createHostKey();
-  const state = emptyState(
-    title.trim().slice(0, 40) || "에너지효율부 온라인 체육대회",
-  );
+  const state = emptyState(title.trim().slice(0, 40) || EVENT_FULL);
   for (let attempt = 0; attempt < 8; attempt++) {
     const code = createCode();
     try {
