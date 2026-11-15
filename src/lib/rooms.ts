@@ -91,7 +91,9 @@ export async function createRoom(title: string): Promise<{
 }> {
   await cleanupOldRooms();
   const hostKey = createHostKey();
-  const state = emptyState(title.trim().slice(0, 40) || "부서 행사");
+  const state = emptyState(
+    title.trim().slice(0, 40) || "에너지효율부 온라인 체육대회",
+  );
   for (let attempt = 0; attempt < 8; attempt++) {
     const code = createCode();
     try {

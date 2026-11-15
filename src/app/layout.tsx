@@ -15,9 +15,9 @@ const body = Noto_Sans_KR({
 });
 
 export const metadata: Metadata = {
-  title: "한판 — 부서행사 화면 게임",
+  title: "한판 — 온라인 체육대회",
   description:
-    "큰 화면으로 진행하고 휴대폰으로 참여하는 O/X 퀴즈·랜덤뽑기·순발력 게임",
+    "대구본부 에너지효율부 온라인 체육대회용 화면 게임. O/X 퀴즈·랜덤뽑기·순발력",
 };
 
 export const viewport: Viewport = {

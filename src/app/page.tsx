@@ -6,7 +6,7 @@ import { createRoom, hostStorageKey } from "@/lib/client";
 
 export default function HomePage() {
   const router = useRouter();
-  const [title, setTitle] = useState("부서 한판");
+  const [title, setTitle] = useState("에너지효율부 온라인 체육대회");
   const [joinCode, setJoinCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -37,11 +37,14 @@ export default function HomePage() {
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col px-5 pb-10 pt-8 md:px-10 md:pt-12">
-      <header className="anim-rise flex items-center justify-between">
+      <header className="anim-rise flex items-center justify-between gap-3">
         <p className="brand-display text-3xl text-[var(--gold)] md:text-4xl">
           한판
         </p>
-        <p className="text-sm text-white/60 md:text-base">부서행사 · 화면게임</p>
+        <p className="text-right text-sm text-white/60 md:text-base">
+          대구본부 에너지효율부
+          <span className="mt-0.5 block text-white/45">온라인 체육대회</span>
+        </p>
       </header>
 
       <section className="mt-10 grid flex-1 items-center gap-10 md:mt-0 md:grid-cols-[1.15fr_0.85fr]">
@@ -50,17 +53,17 @@ export default function HomePage() {
             한판
           </h1>
           <p className="mt-5 max-w-md text-lg leading-relaxed text-white/75 md:text-xl">
-            프로젝터는 무대, 휴대폰은 컨트롤러.
+            큰 화면은 경기장, 휴대폰은 컨트롤러.
             <br />
-            O/X · 랜덤뽑기 · 순발력까지 다같이.
+            O/X · 랜덤뽑기 · 순발력으로 온라인 체육대회.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-3 text-sm text-white/55">
             <span className="rounded-full border border-white/15 px-3 py-1">
-              큰 화면 진행
+              프로젝터 진행
             </span>
             <span className="rounded-full border border-white/15 px-3 py-1">
-              휴대폰 접속
+              휴대폰 참여
             </span>
             <span className="rounded-full border border-white/15 px-3 py-1">
               설치 없음
@@ -78,7 +81,7 @@ export default function HomePage() {
               onChange={(e) => setTitle(e.target.value)}
               className="mt-2 w-full rounded-xl border border-white/15 bg-black/25 px-4 py-3 outline-none ring-[var(--gold)] focus:ring-2"
               maxLength={40}
-              placeholder="예: 영업1팀 송년회"
+              placeholder="예: 에너지효율부 온라인 체육대회"
             />
             <button
               type="submit"
