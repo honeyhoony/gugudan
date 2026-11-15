@@ -11,6 +11,8 @@ import {
   PLAYER_STALE_MS,
   type GameMode,
   type LadderState,
+  type MashState,
+  type MoleState,
   type Player,
   type PublicRoom,
   type RoomState,
@@ -18,7 +20,18 @@ import {
 } from "@/lib/types";
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const MODES: GameMode[] = ["lobby", "ox", "treasure", "ladder"];
+const MODES: GameMode[] = [
+  "lobby",
+  "ox",
+  "treasure",
+  "ladder",
+  "mash",
+  "mole",
+];
+const MASH_COUNTDOWN_MS = 3000;
+const MASH_PLAY_MS = 5000;
+const MOLE_PLAY_MS = 12000;
+const MOLE_SLOTS = 9;
 
 function now() {
   return Date.now();
@@ -57,6 +70,21 @@ function emptyLadder(): LadderState {
   };
 }
 
+function emptyMash(): MashState {
+  return { phase: "idle", endsAt: null, counts: {} };
+}
+
+function emptyMole(): MoleState {
+  return {
+    phase: "idle",
+    endsAt: null,
+    activeSlot: null,
+    activeUntil: null,
+    hits: {},
+    slots: MOLE_SLOTS,
+  };
+}
+
 export function emptyState(title: string): RoomState {
   return {
     title,
@@ -70,6 +98,8 @@ export function emptyState(title: string): RoomState {
     },
     treasure: emptyTreasure(),
     ladder: emptyLadder(),
+    mash: emptyMash(),
+    mole: emptyMole(),
   };
 }
 
@@ -81,6 +111,8 @@ function normalizeState(raw: RoomState): RoomState {
     ox: { ...base.ox, ...(raw.ox ?? {}) },
     treasure: { ...base.treasure, ...(raw.treasure ?? {}) },
     ladder: { ...base.ladder, ...(raw.ladder ?? {}) },
+    mash: { ...base.mash, ...(raw.mash ?? {}) },
+    mole: { ...base.mole, ...(raw.mole ?? {}) },
     players: Array.isArray(raw.players) ? raw.players : [],
     mode: MODES.includes(raw.mode) ? raw.mode : "lobby",
   };
@@ -222,6 +254,37 @@ function resetModes(state: RoomState, mode: GameMode): RoomState {
     ox: { phase: "idle", question: "", answer: "O", answers: {} },
     treasure: emptyTreasure(),
     ladder: emptyLadder(),
+    mash: emptyMash(),
+    mole: emptyMole(),
+  };
+}
+
+function awardTopTapScores(
+  state: RoomState,
+  counts: Record<string, number>,
+): RoomState {
+  const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  let next = state;
+  if (ranked[0] && ranked[0][1] > 0) next = bumpScore(next, ranked[0][0], 2);
+  if (ranked[1] && ranked[1][1] > 0) next = bumpScore(next, ranked[1][0], 1);
+  return next;
+}
+
+function spawnMole(state: RoomState): RoomState {
+  const prev = state.mole.activeSlot;
+  let slot = Math.floor(Math.random() * state.mole.slots);
+  if (state.mole.slots > 1) {
+    for (let i = 0; i < 6 && slot === prev; i++) {
+      slot = Math.floor(Math.random() * state.mole.slots);
+    }
+  }
+  return {
+    ...state,
+    mole: {
+      ...state.mole,
+      activeSlot: slot,
+      activeUntil: now() + 750 + Math.floor(Math.random() * 550),
+    },
   };
 }
 
@@ -236,7 +299,6 @@ function advanceTimedState(state: RoomState): RoomState {
       ...state,
       ladder: { ...state.ladder, phase: "result", runEndsAt: null },
     };
-    // 보너스 결과 점수
     for (const [pid, lane] of Object.entries(state.ladder.picks)) {
       const end = state.ladder.mapping[lane];
       if (end == null) continue;
@@ -245,6 +307,52 @@ function advanceTimedState(state: RoomState): RoomState {
     }
     return next;
   }
+
+  if (state.mode === "mash" && state.mash.endsAt && now() >= state.mash.endsAt) {
+    if (state.mash.phase === "countdown") {
+      return {
+        ...state,
+        mash: {
+          ...state.mash,
+          phase: "play",
+          endsAt: now() + MASH_PLAY_MS,
+          counts: {},
+        },
+      };
+    }
+    if (state.mash.phase === "play") {
+      const finished = {
+        ...state,
+        mash: { ...state.mash, phase: "result" as const, endsAt: null },
+      };
+      return awardTopTapScores(finished, state.mash.counts);
+    }
+  }
+
+  if (state.mode === "mole" && state.mole.phase === "play") {
+    let next = state;
+    if (state.mole.endsAt && now() >= state.mole.endsAt) {
+      const finished = {
+        ...next,
+        mole: {
+          ...next.mole,
+          phase: "result" as const,
+          endsAt: null,
+          activeSlot: null,
+          activeUntil: null,
+        },
+      };
+      return awardTopTapScores(finished, state.mole.hits);
+    }
+    if (
+      next.mole.activeSlot == null ||
+      (next.mole.activeUntil != null && now() >= next.mole.activeUntil)
+    ) {
+      next = spawnMole(next);
+    }
+    return next;
+  }
+
   return state;
 }
 
@@ -398,6 +506,47 @@ export async function hostAction(
       state = { ...state, ladder: emptyLadder() };
       break;
     }
+    case "mashStart": {
+      if (state.players.length < 1) {
+        throw new BadRequestError("선수가 필요합니다.");
+      }
+      state = {
+        ...state,
+        mode: "mash",
+        mash: {
+          phase: "countdown",
+          endsAt: now() + MASH_COUNTDOWN_MS,
+          counts: {},
+        },
+      };
+      break;
+    }
+    case "mashReset": {
+      state = { ...state, mash: emptyMash() };
+      break;
+    }
+    case "moleStart": {
+      if (state.players.length < 1) {
+        throw new BadRequestError("선수가 필요합니다.");
+      }
+      state = spawnMole({
+        ...state,
+        mode: "mole",
+        mole: {
+          phase: "play",
+          endsAt: now() + MOLE_PLAY_MS,
+          activeSlot: null,
+          activeUntil: null,
+          hits: {},
+          slots: MOLE_SLOTS,
+        },
+      });
+      break;
+    }
+    case "moleReset": {
+      state = { ...state, mole: emptyMole() };
+      break;
+    }
     case "kick": {
       const playerId = String(payload.playerId ?? "");
       state = {
@@ -490,7 +639,6 @@ export async function playAction(
       ) {
         throw new BadRequestError("잘못된 레인입니다.");
       }
-      // 이미 다른 선수가 차지한 레인이면 거부
       const taken = Object.entries(state.ladder.picks).find(
         ([pid, l]) => l === lane && pid !== playerId,
       );
@@ -502,6 +650,47 @@ export async function playAction(
           picks: { ...state.ladder.picks, [playerId]: lane },
         },
       };
+      break;
+    }
+    case "mashTap": {
+      state = advanceTimedState(state);
+      if (state.mode !== "mash" || state.mash.phase !== "play") {
+        throw new BadRequestError("지금은 연타할 수 없습니다.");
+      }
+      const add = Math.min(40, Math.max(1, Number(payload.count) || 1));
+      state = {
+        ...state,
+        mash: {
+          ...state.mash,
+          counts: {
+            ...state.mash.counts,
+            [playerId]: (state.mash.counts[playerId] ?? 0) + add,
+          },
+        },
+      };
+      break;
+    }
+    case "moleHit": {
+      state = advanceTimedState(state);
+      if (state.mode !== "mole" || state.mole.phase !== "play") {
+        throw new BadRequestError("지금은 두드릴 수 없습니다.");
+      }
+      const slot = Number(payload.slot);
+      if (!Number.isInteger(slot) || slot !== state.mole.activeSlot) {
+        break;
+      }
+      state = spawnMole({
+        ...state,
+        mole: {
+          ...state.mole,
+          hits: {
+            ...state.mole.hits,
+            [playerId]: (state.mole.hits[playerId] ?? 0) + 1,
+          },
+          activeSlot: null,
+          activeUntil: null,
+        },
+      });
       break;
     }
     default:

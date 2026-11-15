@@ -1,6 +1,13 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState, useTransition } from "react";
+import {
+  FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { useParams } from "next/navigation";
 import { TREASURE_SPOTS } from "@/lib/content";
 import {
@@ -174,6 +181,26 @@ export default function PlayPage() {
             onPick={(lane) => run("ladderPick", { lane })}
           />
         ) : null}
+
+        {state.mode === "mash" ? (
+          <MashPlay
+            phase={state.mash.phase}
+            endsAt={state.mash.endsAt}
+            myCount={player ? state.mash.counts[player.id] ?? 0 : 0}
+            onBurst={(count) => run("mashTap", { count })}
+          />
+        ) : null}
+
+        {state.mode === "mole" ? (
+          <MolePlay
+            phase={state.mole.phase}
+            slots={state.mole.slots}
+            activeSlot={state.mole.activeSlot}
+            myHits={player ? state.mole.hits[player.id] ?? 0 : 0}
+            pending={pending}
+            onHit={(slot) => run("moleHit", { slot })}
+          />
+        ) : null}
       </section>
 
       <section className="mt-4 rounded-2xl bg-black/20 p-4">
@@ -345,6 +372,147 @@ function TreasurePlay({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function MashPlay({
+  phase,
+  endsAt,
+  myCount,
+  onBurst,
+}: {
+  phase: string;
+  endsAt: number | null;
+  myCount: number;
+  onBurst: (count: number) => void;
+}) {
+  const [local, setLocal] = useState(0);
+  const pendingRef = useRef(0);
+  const onBurstRef = useRef(onBurst);
+  onBurstRef.current = onBurst;
+
+  useEffect(() => {
+    setLocal((v) => Math.max(v, myCount));
+  }, [myCount]);
+
+  useEffect(() => {
+    if (phase !== "play") {
+      pendingRef.current = 0;
+      return;
+    }
+    const id = setInterval(() => {
+      const n = pendingRef.current;
+      if (n <= 0) return;
+      pendingRef.current = 0;
+      onBurstRef.current(n);
+    }, 180);
+    return () => clearInterval(id);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase === "countdown" || phase === "idle") setLocal(0);
+  }, [phase]);
+
+  if (phase === "idle") {
+    return (
+      <div className="flex flex-1 items-center justify-center text-white/55">
+        연타 대기 · READY?
+      </div>
+    );
+  }
+  if (phase === "countdown") {
+    const remain = endsAt ? Math.max(1, Math.ceil((endsAt - Date.now()) / 1000)) : 3;
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center">
+        <p className="brand-display anim-go text-7xl text-[var(--gold)]">{remain}</p>
+        <p className="mt-2 text-white/60">손가락 준비!!</p>
+      </div>
+    );
+  }
+  if (phase === "result") {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center text-center">
+        <p className="text-white/60">내 연타</p>
+        <p className="brand-display mt-2 text-6xl text-[var(--gold)]">{local}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-1 flex-col">
+      <p className="text-center text-sm text-white/50">지금 연타!!</p>
+      <p className="brand-display text-center text-5xl text-[var(--gold)]">{local}</p>
+      <button
+        type="button"
+        className="btn btn-primary mt-4 flex flex-1 brand-display text-5xl active:scale-95"
+        onPointerDown={(e) => {
+          e.preventDefault();
+          setLocal((v) => v + 1);
+          pendingRef.current += 1;
+        }}
+      >
+        팡!!
+      </button>
+    </div>
+  );
+}
+
+function MolePlay({
+  phase,
+  slots,
+  activeSlot,
+  myHits,
+  pending,
+  onHit,
+}: {
+  phase: string;
+  slots: number;
+  activeSlot: number | null;
+  myHits: number;
+  pending: boolean;
+  onHit: (slot: number) => void;
+}) {
+  if (phase === "idle") {
+    return (
+      <div className="flex flex-1 items-center justify-center text-white/55">
+        대기전력 잡기 대기
+      </div>
+    );
+  }
+  if (phase === "result") {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center text-center">
+        <p className="text-white/60">처치한 대기전력</p>
+        <p className="brand-display mt-2 text-6xl text-[var(--gold)]">{myHits}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-1 flex-col">
+      <p className="text-sm text-white/50">빨간 ON 을 터치!</p>
+      <p className="mt-1 text-[var(--gold)]">내 처치 {myHits}</p>
+      <div className="mt-4 grid flex-1 grid-cols-3 gap-2">
+        {Array.from({ length: slots }, (_, i) => {
+          const on = activeSlot === i;
+          return (
+            <button
+              key={i}
+              type="button"
+              disabled={pending}
+              onClick={() => onHit(i)}
+              className={`rounded-2xl text-lg font-bold transition active:scale-95 ${
+                on
+                  ? "btn-ox-x anim-go min-h-20"
+                  : "min-h-20 bg-black/30 text-white/30"
+              }`}
+            >
+              {on ? "ON" : "off"}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

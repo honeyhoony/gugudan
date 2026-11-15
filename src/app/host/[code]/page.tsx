@@ -141,6 +141,22 @@ export default function HostPage() {
                 onReset={() => run("ladderReset")}
               />
             ) : null}
+            {state.mode === "mash" ? (
+              <MashHostView
+                state={state}
+                pending={pending}
+                onStart={() => run("mashStart")}
+                onReset={() => run("mashReset")}
+              />
+            ) : null}
+            {state.mode === "mole" ? (
+              <MoleHostView
+                state={state}
+                pending={pending}
+                onStart={() => run("moleStart")}
+                onReset={() => run("moleReset")}
+              />
+            ) : null}
           </div>
         </section>
 
@@ -190,8 +206,10 @@ function ModeTabs({
   const items: { id: GameMode; label: string }[] = [
     { id: "lobby", label: "대기실" },
     { id: "ox", label: "O/X" },
-    { id: "treasure", label: "오봉산 보물" },
-    { id: "ladder", label: "태양광 사다리" },
+    { id: "treasure", label: "오봉산" },
+    { id: "ladder", label: "사다리" },
+    { id: "mash", label: "연타!!" },
+    { id: "mole", label: "대기전력" },
   ];
   return (
     <div className="flex flex-wrap gap-2">
@@ -222,8 +240,167 @@ function LobbyView({ count, code }: { count: number; code: string }) {
       <p className="mt-2 text-xl text-white/70">명 등록</p>
       <p className="mt-8 max-w-md text-white/55">
         휴대폰에서 <span className="text-[var(--gold)]">{code}</span> 입력 후
-        선수 등록 · O/X · 오봉산 보물찾기 · 태양광 사다리
+        선수 등록 · O/X · 보물 · 사다리 · 연타 · 대기전력잡기
       </p>
+    </div>
+  );
+}
+
+function liveRanking(
+  players: RoomState["players"],
+  counts: Record<string, number>,
+) {
+  return [...players]
+    .map((p) => ({ ...p, taps: counts[p.id] ?? 0 }))
+    .sort((a, b) => b.taps - a.taps || a.joinedAt - b.joinedAt);
+}
+
+function MashHostView({
+  state,
+  pending,
+  onStart,
+  onReset,
+}: {
+  state: RoomState;
+  pending: boolean;
+  onStart: () => void;
+  onReset: () => void;
+}) {
+  const m = state.mash;
+  const ranked = liveRanking(state.players, m.counts);
+  const remain =
+    m.endsAt != null ? Math.max(0, Math.ceil((m.endsAt - Date.now()) / 1000)) : 0;
+
+  return (
+    <div className="flex flex-1 flex-col">
+      <h2 className="brand-display text-4xl md:text-5xl">연타!! 챌린지</h2>
+      <p className="mt-2 text-white/60">
+        저급한 닌텐도 파티 감성. 5초 동안 미친 듯이 터치!
+      </p>
+      <div className="mt-8 flex flex-1 flex-col items-center justify-center text-center">
+        {m.phase === "idle" ? (
+          <p className="brand-display text-5xl text-white/40">READY?</p>
+        ) : null}
+        {m.phase === "countdown" ? (
+          <p className="brand-display anim-go text-8xl text-[var(--gold)]">
+            {remain || "GO"}
+          </p>
+        ) : null}
+        {m.phase === "play" ? (
+          <>
+            <p className="brand-display anim-go text-7xl text-[var(--coral)]">연타!</p>
+            <p className="mt-2 text-2xl text-white/70">{remain}초</p>
+          </>
+        ) : null}
+        {m.phase === "result" ? (
+          <div className="anim-rise">
+            <p className="text-white/60">연타왕</p>
+            <p className="brand-display mt-2 text-5xl text-[var(--gold)]">
+              {ranked[0]?.taps ? ranked[0].name : "?"}
+            </p>
+            <p className="mt-2 text-xl">{ranked[0]?.taps ?? 0} 회</p>
+          </div>
+        ) : null}
+      </div>
+      {(m.phase === "play" || m.phase === "result") && (
+        <ol className="mt-4 grid gap-2 md:grid-cols-2">
+          {ranked.slice(0, 6).map((p, i) => (
+            <li key={p.id} className="rounded-xl bg-white/5 px-3 py-2 text-sm">
+              {i + 1}. {p.name}
+              <span className="float-right font-bold text-[var(--gold)]">
+                {p.taps}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+      <div className="mt-5 flex gap-3">
+        {(m.phase === "idle" || m.phase === "result") && (
+          <button type="button" disabled={pending} onClick={onStart} className="btn btn-primary">
+            {m.phase === "result" ? "한 판 더!!" : "시작"}
+          </button>
+        )}
+        {m.phase !== "idle" ? (
+          <button type="button" disabled={pending} onClick={onReset} className="btn btn-ghost">
+            리셋
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function MoleHostView({
+  state,
+  pending,
+  onStart,
+  onReset,
+}: {
+  state: RoomState;
+  pending: boolean;
+  onStart: () => void;
+  onReset: () => void;
+}) {
+  const m = state.mole;
+  const ranked = liveRanking(state.players, m.hits);
+  const remain =
+    m.endsAt != null ? Math.max(0, Math.ceil((m.endsAt - Date.now()) / 1000)) : 0;
+
+  return (
+    <div className="flex flex-1 flex-col">
+      <h2 className="brand-display text-4xl md:text-5xl">대기전력 잡기</h2>
+      <p className="mt-2 text-white/60">
+        켜진 대기전력(빨간 불)을 휴대폰으로 팡팡 두드리기. 아케이드 두더지!
+      </p>
+      <div className="mt-6 grid grid-cols-3 gap-3 md:gap-4">
+        {Array.from({ length: m.slots }, (_, i) => {
+          const on = m.phase === "play" && m.activeSlot === i;
+          return (
+            <div
+              key={i}
+              className={`flex aspect-square items-center justify-center rounded-2xl border-2 text-2xl font-bold md:text-4xl ${
+                on
+                  ? "anim-go border-[var(--coral)] bg-[var(--coral)] text-white"
+                  : "border-white/10 bg-black/30 text-white/25"
+              }`}
+            >
+              {on ? "ON" : "off"}
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-4 text-white/55">
+        {m.phase === "play" ? `남은 시간 ${remain}초` : m.phase === "result" ? "종료!" : "대기"}
+      </p>
+      {m.phase === "result" ? (
+        <p className="brand-display mt-2 text-3xl text-[var(--gold)]">
+          절전왕 {ranked[0]?.taps ? ranked[0].name : "?"}
+        </p>
+      ) : null}
+      {(m.phase === "play" || m.phase === "result") && (
+        <ol className="mt-3 grid gap-2 md:grid-cols-2">
+          {ranked.slice(0, 6).map((p, i) => (
+            <li key={p.id} className="rounded-xl bg-white/5 px-3 py-2 text-sm">
+              {i + 1}. {p.name}
+              <span className="float-right font-bold text-[var(--gold)]">
+                {p.taps}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+      <div className="mt-5 flex gap-3">
+        {(m.phase === "idle" || m.phase === "result") && (
+          <button type="button" disabled={pending} onClick={onStart} className="btn btn-primary">
+            {m.phase === "result" ? "한 판 더!!" : "시작"}
+          </button>
+        )}
+        {m.phase !== "idle" ? (
+          <button type="button" disabled={pending} onClick={onReset} className="btn btn-ghost">
+            리셋
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }

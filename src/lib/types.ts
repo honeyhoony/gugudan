@@ -1,4 +1,10 @@
-export type GameMode = "lobby" | "ox" | "treasure" | "ladder";
+export type GameMode =
+  | "lobby"
+  | "ox"
+  | "treasure"
+  | "ladder"
+  | "mash"
+  | "mole";
 
 export type Player = {
   id: string;
@@ -11,6 +17,8 @@ export type Player = {
 export type OxPhase = "idle" | "question" | "reveal";
 export type TreasurePhase = "idle" | "clue" | "reveal";
 export type LadderPhase = "idle" | "picking" | "running" | "result";
+export type MashPhase = "idle" | "countdown" | "play" | "result";
+export type MolePhase = "idle" | "play" | "result";
 
 export type OxState = {
   phase: OxPhase;
@@ -36,6 +44,21 @@ export type LadderState = {
   runEndsAt: number | null;
 };
 
+export type MashState = {
+  phase: MashPhase;
+  endsAt: number | null;
+  counts: Record<string, number>;
+};
+
+export type MoleState = {
+  phase: MolePhase;
+  endsAt: number | null;
+  activeSlot: number | null;
+  activeUntil: number | null;
+  hits: Record<string, number>;
+  slots: number;
+};
+
 export type RoomState = {
   title: string;
   mode: GameMode;
@@ -43,6 +66,8 @@ export type RoomState = {
   ox: OxState;
   treasure: TreasureState;
   ladder: LadderState;
+  mash: MashState;
+  mole: MoleState;
 };
 
 export type PublicRoom = {
