@@ -58,9 +58,9 @@ export default function HomePage() {
             체육대회
           </h1>
           <p className="mt-5 max-w-md text-lg leading-relaxed text-white/75 md:text-xl">
-            프로젝터는 경기장, 휴대폰은 선수 컨트롤러.
+            프로젝터는 오락실 전광판, 휴대폰은 컨트롤러.
             <br />
-            사다리 · 연타 · 목표 5.00 kWh · 대기전력 두더지.
+            고르기만 하면 되는 미니게임 + 목표 5.00 kWh 메인 종목.
           </p>
         </div>
 

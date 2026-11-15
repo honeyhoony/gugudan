@@ -14,12 +14,23 @@ import {
   readingAt,
 } from "@/lib/kwh";
 import {
+  initialChallenge,
+  MICRO_COUNTDOWN_MS,
+  MICRO_DURATION_MS,
+  newLeftRight,
+  newMathOdd,
+  newRps,
+  rpsWins,
+} from "@/lib/micro";
+import {
   EVENT_FULL,
   PLAYER_STALE_MS,
   type GameMode,
   type KwhState,
   type LadderState,
   type MashState,
+  type MicroId,
+  type MicroState,
   type MoleState,
   type Player,
   type PublicRoom,
@@ -36,6 +47,16 @@ const MODES: GameMode[] = [
   "mash",
   "mole",
   "kwh",
+  "micro",
+];
+const MICRO_IDS: MicroId[] = [
+  "rub",
+  "sprint",
+  "ruler",
+  "mathOdd",
+  "leftRight",
+  "rps",
+  "order",
 ];
 const MASH_COUNTDOWN_MS = 3000;
 const MASH_PLAY_MS = 5000;
@@ -104,6 +125,18 @@ function emptyKwh(): KwhState {
   };
 }
 
+function emptyMicro(): MicroState {
+  return {
+    id: null,
+    phase: "idle",
+    endsAt: null,
+    startedAt: null,
+    scores: {},
+    meta: {},
+    challenge: {},
+  };
+}
+
 export function emptyState(title: string): RoomState {
   return {
     title,
@@ -120,6 +153,7 @@ export function emptyState(title: string): RoomState {
     mash: emptyMash(),
     mole: emptyMole(),
     kwh: emptyKwh(),
+    micro: emptyMicro(),
   };
 }
 
@@ -134,6 +168,7 @@ function normalizeState(raw: RoomState): RoomState {
     mash: { ...base.mash, ...(raw.mash ?? {}) },
     mole: { ...base.mole, ...(raw.mole ?? {}) },
     kwh: { ...base.kwh, ...(raw.kwh ?? {}) },
+    micro: { ...base.micro, ...(raw.micro ?? {}) },
     players: Array.isArray(raw.players) ? raw.players : [],
     mode: MODES.includes(raw.mode) ? raw.mode : "lobby",
   };
@@ -218,6 +253,7 @@ function timedSignature(state: RoomState): string {
       runEndsAt: state.ladder.runEndsAt,
     },
     kwh: state.kwh,
+    micro: state.micro,
   });
 }
 
@@ -317,6 +353,7 @@ function resetModes(state: RoomState, mode: GameMode): RoomState {
     mash: emptyMash(),
     mole: emptyMole(),
     kwh: emptyKwh(),
+    micro: emptyMicro(),
   };
 }
 
@@ -472,7 +509,57 @@ function advanceTimedState(state: RoomState): RoomState {
     }
   }
 
+  if (state.mode === "micro" && state.micro.id) {
+    const microId = state.micro.id;
+    const m = state.micro;
+    if (m.phase === "countdown" && m.endsAt && now() >= m.endsAt) {
+      const start = now();
+      const dur = MICRO_DURATION_MS[microId];
+      let challenge = initialChallenge(microId);
+      if (microId === "ruler") {
+        const delay = 1500 + Math.floor(Math.random() * 2500);
+        challenge = { goAt: start + delay };
+      }
+      return {
+        ...state,
+        micro: {
+          ...m,
+          phase: "play",
+          startedAt: start,
+          endsAt: dur > 0 ? start + dur : null,
+          scores: {},
+          meta: {},
+          challenge,
+        },
+      };
+    }
+    if (m.phase === "play") {
+      // ruler: wait for go — no auto end until catch or timeout 8s after go
+      if (microId === "ruler") {
+        const goAt = Number(m.challenge.goAt ?? 0);
+        if (goAt && now() > goAt + 8000) {
+          return finalizeMicro(state);
+        }
+        return state;
+      }
+      if (m.endsAt && now() >= m.endsAt) {
+        return finalizeMicro(state);
+      }
+    }
+  }
+
   return state;
+}
+
+function finalizeMicro(state: RoomState): RoomState {
+  const ranked = Object.entries(state.micro.scores).sort((a, b) => b[1] - a[1]);
+  let next: RoomState = {
+    ...state,
+    micro: { ...state.micro, phase: "result", endsAt: null },
+  };
+  if (ranked[0] && ranked[0][1] > 0) next = bumpScore(next, ranked[0][0], 2);
+  if (ranked[1] && ranked[1][1] > 0) next = bumpScore(next, ranked[1][0], 1);
+  return next;
 }
 
 export async function hostAction(
@@ -708,6 +795,33 @@ export async function hostAction(
       state = { ...state, kwh: emptyKwh() };
       break;
     }
+    case "microStart": {
+      const id = String(payload.id) as MicroId;
+      if (!MICRO_IDS.includes(id)) {
+        throw new BadRequestError("알 수 없는 미니게임입니다.");
+      }
+      if (state.players.length < 1) {
+        throw new BadRequestError("선수가 필요합니다.");
+      }
+      state = {
+        ...resetModes(state, "micro"),
+        mode: "micro",
+        micro: {
+          id,
+          phase: "countdown",
+          endsAt: now() + MICRO_COUNTDOWN_MS,
+          startedAt: null,
+          scores: {},
+          meta: {},
+          challenge: {},
+        },
+      };
+      break;
+    }
+    case "microReset": {
+      state = { ...state, micro: emptyMicro(), mode: "lobby" };
+      break;
+    }
     case "kick": {
       const playerId = String(payload.playerId ?? "");
       state = {
@@ -878,6 +992,141 @@ export async function playAction(
         state.players.every((p) => state.kwh.stops[p.id] != null);
       if (allIn) state = finalizeKwh(state);
       break;
+    }
+    case "microAction": {
+      state = advanceTimedState(state);
+      if (state.mode !== "micro" || state.micro.phase !== "play" || !state.micro.id) {
+        throw new BadRequestError("지금은 플레이할 수 없습니다.");
+      }
+      const type = String(payload.type ?? "");
+      const id = state.micro.id;
+      const addScore = (n: number) => {
+        state = {
+          ...state,
+          micro: {
+            ...state.micro,
+            scores: {
+              ...state.micro.scores,
+              [playerId]: (state.micro.scores[playerId] ?? 0) + n,
+            },
+          },
+        };
+      };
+
+      if (id === "rub" && type === "rub") {
+        const n = Math.min(40, Math.max(1, Number(payload.count) || 1));
+        addScore(n);
+        break;
+      }
+
+      if (id === "sprint" && type === "step") {
+        const side = String(payload.side);
+        if (side !== "L" && side !== "R") break;
+        const lastKey = `sprint:${playerId}`;
+        const last = String(state.micro.meta[lastKey] ?? "");
+        if (last === side) break;
+        state = {
+          ...state,
+          micro: {
+            ...state.micro,
+            meta: { ...state.micro.meta, [lastKey]: side },
+            scores: {
+              ...state.micro.scores,
+              [playerId]: (state.micro.scores[playerId] ?? 0) + 1,
+            },
+          },
+        };
+        break;
+      }
+
+      if (id === "ruler" && type === "catch") {
+        if (state.micro.scores[playerId] != null) break;
+        const goAt = Number(state.micro.challenge.goAt ?? 0);
+        if (!goAt || now() < goAt) break; // early = ignore
+        const ms = now() - goAt;
+        const points = Math.max(0, 2000 - ms);
+        state = {
+          ...state,
+          micro: {
+            ...state.micro,
+            scores: { ...state.micro.scores, [playerId]: points },
+          },
+        };
+        const allCaught =
+          state.players.length > 0 &&
+          state.players.every((p) => state.micro.scores[p.id] != null);
+        if (allCaught) state = finalizeMicro(state);
+        break;
+      }
+
+      if (id === "mathOdd" && type === "answer") {
+        const odd = Boolean(payload.odd);
+        const expect = Boolean(state.micro.challenge.odd);
+        if (odd === expect) {
+          addScore(1);
+          state = {
+            ...state,
+            micro: { ...state.micro, challenge: newMathOdd() },
+          };
+        } else {
+          state = {
+            ...state,
+            micro: { ...state.micro, challenge: newMathOdd() },
+          };
+        }
+        break;
+      }
+
+      if (id === "leftRight" && type === "side") {
+        const side = String(payload.side);
+        const expect = String(state.micro.challenge.correct);
+        if (side === expect) {
+          addScore(1);
+          state = {
+            ...state,
+            micro: { ...state.micro, challenge: newLeftRight() },
+          };
+        } else {
+          state = {
+            ...state,
+            micro: { ...state.micro, challenge: newLeftRight() },
+          };
+        }
+        break;
+      }
+
+      if (id === "rps" && type === "hand") {
+        const hand = String(payload.hand) as "가위" | "바위" | "보";
+        if (!["가위", "바위", "보"].includes(hand)) break;
+        const cpu = String(state.micro.challenge.cpu) as "가위" | "바위" | "보";
+        const goal = String(state.micro.challenge.goal);
+        const won = rpsWins(hand, cpu);
+        const ok =
+          (goal === "이기기" && won) ||
+          (goal === "지기" && !won && hand !== cpu);
+        if (ok) addScore(1);
+        state = {
+          ...state,
+          micro: { ...state.micro, challenge: newRps() },
+        };
+        break;
+      }
+
+      if (id === "order" && type === "finish") {
+        if (state.micro.scores[playerId] != null) break;
+        const ms = Math.max(0, Number(payload.ms) || 60000);
+        const points = Math.max(0, 100000 - ms);
+        state = {
+          ...state,
+          micro: {
+            ...state.micro,
+            scores: { ...state.micro.scores, [playerId]: points },
+          },
+        };
+        break;
+      }
+
+      throw new BadRequestError("알 수 없는 미니 동작입니다.");
     }
     default:
       throw new BadRequestError("알 수 없는 동작입니다.");

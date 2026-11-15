@@ -19,6 +19,8 @@ import {
 import { useRoom } from "@/hooks/useRoom";
 import { ScoreList } from "@/components/ScoreList";
 import { badgeLabel, formatKwh, kwhBadge, readingAt } from "@/lib/kwh";
+import { microTitle } from "@/lib/micro";
+import type { MicroId } from "@/lib/types";
 
 type SavedPlayer = { id: string; name: string };
 
@@ -215,6 +217,20 @@ export default function PlayPage() {
             onStop={() => run("kwhStop")}
           />
         ) : null}
+
+        {state.mode === "micro" && state.micro.id ? (
+          <MicroPlay
+            id={state.micro.id}
+            phase={state.micro.phase}
+            endsAt={state.micro.endsAt}
+            challenge={state.micro.challenge}
+            myScore={player ? state.micro.scores[player.id] ?? 0 : 0}
+            pending={pending}
+            onAction={(type, payload) =>
+              run("microAction", { type, ...payload })
+            }
+          />
+        ) : null}
       </section>
 
       <section className="mt-4 rounded-2xl bg-black/20 p-4">
@@ -386,6 +402,281 @@ function TreasurePlay({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function MicroPlay({
+  id,
+  phase,
+  endsAt,
+  challenge,
+  myScore,
+  pending,
+  onAction,
+}: {
+  id: MicroId;
+  phase: string;
+  endsAt: number | null;
+  challenge: Record<string, unknown>;
+  myScore: number;
+  pending: boolean;
+  onAction: (type: string, payload?: Record<string, unknown>) => void;
+}) {
+  const title = microTitle(id);
+  const [local, setLocal] = useState(0);
+  const pendingRef = useRef(0);
+  const onActionRef = useRef(onAction);
+  onActionRef.current = onAction;
+  const [orderNext, setOrderNext] = useState(1);
+  const [orderGrid, setOrderGrid] = useState<number[]>([]);
+  const orderStart = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (phase === "play" && id === "order") {
+      const nums = Array.from({ length: 16 }, (_, i) => i + 1).sort(
+        () => Math.random() - 0.5,
+      );
+      setOrderGrid(nums);
+      setOrderNext(1);
+      orderStart.current = Date.now();
+    }
+  }, [phase, id]);
+
+  useEffect(() => {
+    if (phase !== "play" || (id !== "rub" && id !== "sprint")) {
+      pendingRef.current = 0;
+      return;
+    }
+    if (id !== "rub") return;
+    const timer = setInterval(() => {
+      const n = pendingRef.current;
+      if (n <= 0) return;
+      pendingRef.current = 0;
+      onActionRef.current("rub", { count: n });
+    }, 180);
+    return () => clearInterval(timer);
+  }, [phase, id]);
+
+  useEffect(() => {
+    if (phase === "countdown" || phase === "idle") setLocal(0);
+  }, [phase]);
+
+  if (phase === "countdown") {
+    const remain = endsAt ? Math.max(1, Math.ceil((endsAt - Date.now()) / 1000)) : 3;
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center">
+        <p className="text-white/50">{title}</p>
+        <p className="brand-display anim-go mt-2 text-7xl text-[var(--gold)]">{remain}</p>
+      </div>
+    );
+  }
+
+  if (phase === "result") {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center text-center">
+        <p className="text-white/60">{title} 결과</p>
+        <p className="brand-display mt-2 text-6xl text-[var(--gold)]">
+          {id === "order" || id === "ruler" ? myScore : Math.max(local, myScore)}
+        </p>
+      </div>
+    );
+  }
+
+  if (phase !== "play") {
+    return (
+      <div className="flex flex-1 items-center justify-center text-white/55">
+        {title} 대기
+      </div>
+    );
+  }
+
+  if (id === "rub") {
+    return (
+      <div className="flex flex-1 flex-col">
+        <p className="text-center text-sm text-white/50">좌우로 문지르기!</p>
+        <p className="brand-display text-center text-5xl text-[var(--gold)]">{local}</p>
+        <div
+          className="mt-3 flex flex-1 touch-none items-center justify-center rounded-2xl bg-orange-500/20 text-2xl font-bold"
+          onPointerMove={(e) => {
+            e.preventDefault();
+            setLocal((v) => v + 1);
+            pendingRef.current += 1;
+          }}
+        >
+          문질러!!
+        </div>
+      </div>
+    );
+  }
+
+  if (id === "sprint") {
+    return (
+      <div className="flex flex-1 flex-col">
+        <p className="text-center text-sm text-white/50">좌우 번갈아 터치 · 100m</p>
+        <p className="brand-display text-center text-5xl text-[var(--gold)]">{myScore}</p>
+        <div className="mt-3 grid flex-1 grid-cols-2 gap-3">
+          <button
+            type="button"
+            className="btn btn-sea brand-display text-4xl"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              onAction("step", { side: "L" });
+            }}
+          >
+            L
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary brand-display text-4xl"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              onAction("step", { side: "R" });
+            }}
+          >
+            R
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (id === "ruler") {
+    const goAt = Number(challenge.goAt ?? 0);
+    const ready = goAt && Date.now() >= goAt;
+    const done = myScore > 0;
+    return (
+      <div className="flex flex-1 flex-col">
+        {done ? (
+          <div className="flex flex-1 flex-col items-center justify-center">
+            <p className="text-white/60">반응 점수</p>
+            <p className="brand-display text-5xl text-[var(--gold)]">{myScore}</p>
+          </div>
+        ) : (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => onAction("catch")}
+            className={`flex flex-1 brand-display text-4xl ${
+              ready ? "btn btn-ox-x anim-go" : "btn btn-ghost"
+            }`}
+          >
+            {ready ? "잡아!!" : "대기…"}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (id === "mathOdd") {
+    return (
+      <div className="flex flex-1 flex-col">
+        <p className="text-sm text-white/50">홀수? 짝수? · 점수 {myScore}</p>
+        <p className="brand-display mt-4 text-center text-4xl text-[var(--gold)]">
+          {String(challenge.expr ?? "")}
+        </p>
+        <div className="mt-6 grid flex-1 grid-cols-2 gap-3">
+          <button
+            type="button"
+            disabled={pending}
+            className="btn btn-sea text-2xl"
+            onClick={() => onAction("answer", { odd: true })}
+          >
+            홀수
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            className="btn btn-primary text-2xl"
+            onClick={() => onAction("answer", { odd: false })}
+          >
+            짝수
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (id === "leftRight") {
+    return (
+      <div className="flex flex-1 flex-col">
+        <p className="text-sm text-white/50">지시대로 · {myScore}점</p>
+        <p className="brand-display mt-4 text-center text-4xl">
+          {String(challenge.prompt ?? "")}
+        </p>
+        <div className="mt-6 grid flex-1 grid-cols-2 gap-3">
+          <button
+            type="button"
+            disabled={pending}
+            className="btn btn-sea text-2xl"
+            onClick={() => onAction("side", { side: "L" })}
+          >
+            왼쪽
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            className="btn btn-primary text-2xl"
+            onClick={() => onAction("side", { side: "R" })}
+          >
+            오른쪽
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (id === "rps") {
+    return (
+      <div className="flex flex-1 flex-col">
+        <p className="text-sm text-white/50">
+          상대 {String(challenge.cpu)} · {String(challenge.goal)} · {myScore}점
+        </p>
+        <div className="mt-6 grid flex-1 grid-cols-3 gap-2">
+          {(["가위", "바위", "보"] as const).map((hand) => (
+            <button
+              key={hand}
+              type="button"
+              disabled={pending}
+              className="btn btn-ghost text-xl"
+              onClick={() => onAction("hand", { hand })}
+            >
+              {hand}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // order
+  return (
+    <div className="flex flex-1 flex-col">
+      <p className="text-sm text-white/50">다음 숫자 {orderNext} / 16</p>
+      <div className="mt-3 grid flex-1 grid-cols-4 gap-2">
+        {orderGrid.map((n) => (
+          <button
+            key={n}
+            type="button"
+            disabled={n < orderNext}
+            className={`rounded-xl text-lg font-bold ${
+              n < orderNext ? "bg-white/5 text-white/20" : "btn btn-ghost"
+            }`}
+            onClick={() => {
+              if (n !== orderNext) return;
+              if (n === 16) {
+                const ms = Date.now() - (orderStart.current ?? Date.now());
+                onAction("finish", { ms });
+                setOrderNext(17);
+                return;
+              }
+              setOrderNext(n + 1);
+            }}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

@@ -2,15 +2,18 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { ArcadeLobby } from "@/components/ArcadeLobby";
 import { JoinQr } from "@/components/JoinQr";
 import { PowerMeter } from "@/components/PowerMeter";
 import { ScoreList } from "@/components/ScoreList";
 import { SolarLadder } from "@/components/SolarLadder";
 import { TreasureMap } from "@/components/TreasureMap";
+import type { ArcadeGame } from "@/lib/arcadeCatalog";
 import { TREASURE_SPOTS } from "@/lib/content";
 import { hostCommand, hostStorageKey } from "@/lib/client";
 import { useRoom } from "@/hooks/useRoom";
 import { badgeLabel, formatKwh, rankByTarget, readingAt } from "@/lib/kwh";
+import { microTitle } from "@/lib/micro";
 import type { GameMode, RoomState } from "@/lib/types";
 
 export default function HostPage() {
@@ -43,6 +46,26 @@ export default function HostPage() {
         }
       })();
     });
+  }
+
+  function launchGame(game: ArcadeGame) {
+    if (game.kind === "micro" && game.microId) {
+      run("microStart", { id: game.microId });
+      return;
+    }
+    switch (game.mode) {
+      case "mash":
+        run("mashStart");
+        break;
+      case "mole":
+        run("moleStart");
+        break;
+      case "kwh":
+        run("kwhStart");
+        break;
+      default:
+        if (game.mode) run("setMode", { mode: game.mode });
+    }
   }
 
   const oxCounts = useMemo(() => {
@@ -90,23 +113,44 @@ export default function HostPage() {
               {code}
             </p>
           </div>
-          <div className="hidden sm:block">
-            <JoinQr code={code} />
-          </div>
+          {state.mode !== "lobby" ? (
+            <div className="hidden sm:block">
+              <JoinQr code={code} />
+            </div>
+          ) : null}
         </div>
       </header>
 
+      {state.mode === "lobby" ? (
+        <ArcadeLobby
+          code={code}
+          title={state.title}
+          players={state.players}
+          disabled={pending}
+          onPick={launchGame}
+        />
+      ) : (
       <div className="grid flex-1 gap-5 lg:grid-cols-[1fr_300px]">
         <section className="panel flex min-h-[420px] flex-col rounded-3xl p-5 md:p-8">
-          <ModeTabs
-            mode={state.mode}
-            onChange={(mode) => run("setMode", { mode })}
-            disabled={pending}
-          />
-          <div className="mt-6 flex flex-1 flex-col">
-            {state.mode === "lobby" ? (
-              <LobbyView count={state.players.length} code={code} />
-            ) : null}
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="btn btn-ghost !py-2 text-sm"
+              disabled={pending}
+              onClick={() => {
+                if (state.mode === "micro") run("microReset");
+                else run("setMode", { mode: "lobby" });
+              }}
+            >
+              ← 오락실
+            </button>
+            <ModeTabs
+              mode={state.mode}
+              onChange={(mode) => run("setMode", { mode })}
+              disabled={pending}
+            />
+          </div>
+          <div className="mt-2 flex flex-1 flex-col">
             {state.mode === "ox" ? (
               <OxHostView
                 state={state}
@@ -168,6 +212,16 @@ export default function HostPage() {
                 onReset={() => run("kwhReset")}
               />
             ) : null}
+            {state.mode === "micro" ? (
+              <MicroHostView
+                state={state}
+                pending={pending}
+                onAgain={() =>
+                  state.micro.id && run("microStart", { id: state.micro.id })
+                }
+                onReset={() => run("microReset")}
+              />
+            ) : null}
           </div>
         </section>
 
@@ -189,6 +243,7 @@ export default function HostPage() {
           <ScoreList players={state.players} />
         </aside>
       </div>
+      )}
 
       {msg ? (
         <p className="rounded-xl bg-red-500/20 px-4 py-3 text-sm">{msg}</p>
@@ -215,11 +270,10 @@ function ModeTabs({
   disabled?: boolean;
 }) {
   const items: { id: GameMode; label: string }[] = [
-    { id: "lobby", label: "대기실" },
-    { id: "ladder", label: "1 사다리" },
-    { id: "mash", label: "2 연타" },
-    { id: "kwh", label: "3 5.00kWh" },
-    { id: "mole", label: "4 두더지" },
+    { id: "kwh", label: "5.00kWh" },
+    { id: "mash", label: "연타" },
+    { id: "mole", label: "두더지" },
+    { id: "ladder", label: "사다리" },
     { id: "ox", label: "O/X" },
     { id: "treasure", label: "오봉산" },
   ];
@@ -240,20 +294,6 @@ function ModeTabs({
           {item.label}
         </button>
       ))}
-    </div>
-  );
-}
-
-function LobbyView({ count, code }: { count: number; code: string }) {
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center text-center">
-      <p className="text-white/60">선수 입장 중 · 개회 대기</p>
-      <p className="brand-display mt-3 text-7xl text-white md:text-8xl">{count}</p>
-      <p className="mt-2 text-xl text-white/70">명 등록</p>
-      <p className="mt-8 max-w-md text-white/55">
-        휴대폰에서 <span className="text-[var(--gold)]">{code}</span> 입력 후
-        1 전력망 사다리 → 2 연타 → 3 목표 5.00 kWh → 4 대기전력 두더지
-      </p>
     </div>
   );
 }
@@ -805,6 +845,95 @@ function KwhHostView({
           리셋
         </button>
       ) : null}
+    </div>
+  );
+}
+
+function MicroHostView({
+  state,
+  pending,
+  onAgain,
+  onReset,
+}: {
+  state: RoomState;
+  pending: boolean;
+  onAgain: () => void;
+  onReset: () => void;
+}) {
+  const m = state.micro;
+  const title = m.id ? microTitle(m.id) : "미니게임";
+  const ranked = liveRanking(state.players, m.scores);
+  const remain =
+    m.endsAt != null ? Math.max(0, Math.ceil((m.endsAt - Date.now()) / 1000)) : 0;
+  const goAt = Number(m.challenge.goAt ?? 0);
+  const rulerGo = m.id === "ruler" && m.phase === "play" && goAt && Date.now() >= goAt;
+
+  return (
+    <div className="flex flex-1 flex-col">
+      <p className="text-sm text-[var(--gold)]">오락실 미니게임</p>
+      <h2 className="brand-display text-4xl md:text-5xl">{title}</h2>
+      <div className="mt-8 flex flex-1 flex-col items-center justify-center text-center">
+        {m.phase === "countdown" ? (
+          <p className="brand-display anim-go text-8xl text-[var(--gold)]">
+            {remain || "GO"}
+          </p>
+        ) : null}
+        {m.phase === "play" && m.id === "ruler" ? (
+          <p className="brand-display anim-go text-6xl text-[var(--coral)]">
+            {rulerGo ? "지금!!" : "기다리세요…"}
+          </p>
+        ) : null}
+        {m.phase === "play" && m.id !== "ruler" ? (
+          <>
+            <p className="brand-display text-5xl text-white">PLAY!</p>
+            {m.endsAt ? <p className="mt-2 text-xl text-white/60">{remain}초</p> : null}
+            {m.id === "mathOdd" ? (
+              <p className="mt-4 font-mono text-3xl text-[var(--gold)]">
+                {String(m.challenge.expr ?? "")} = 홀? 짝?
+              </p>
+            ) : null}
+            {m.id === "leftRight" ? (
+              <p className="brand-display mt-4 text-4xl">{String(m.challenge.prompt ?? "")}</p>
+            ) : null}
+            {m.id === "rps" ? (
+              <p className="mt-4 text-2xl">
+                상대 <span className="text-[var(--gold)]">{String(m.challenge.cpu)}</span>
+                {" · "}
+                미션 <span className="text-teal-200">{String(m.challenge.goal)}</span>
+              </p>
+            ) : null}
+          </>
+        ) : null}
+        {m.phase === "result" ? (
+          <div className="anim-rise">
+            <p className="text-white/60">1등</p>
+            <p className="brand-display mt-2 text-5xl text-[var(--gold)]">
+              {ranked[0]?.taps ? ranked[0].name : "?"}
+            </p>
+            <p className="mt-2 text-xl">{ranked[0]?.taps ?? 0} 점</p>
+          </div>
+        ) : null}
+      </div>
+      {(m.phase === "play" || m.phase === "result") && (
+        <ol className="mt-4 grid gap-2 md:grid-cols-2">
+          {ranked.slice(0, 8).map((p, i) => (
+            <li key={p.id} className="rounded-xl bg-white/5 px-3 py-2 text-sm">
+              {i + 1}. {p.name}
+              <span className="float-right font-bold text-[var(--gold)]">{p.taps}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+      <div className="mt-5 flex gap-3">
+        {m.phase === "result" ? (
+          <button type="button" disabled={pending} onClick={onAgain} className="btn btn-primary">
+            한 판 더!!
+          </button>
+        ) : null}
+        <button type="button" disabled={pending} onClick={onReset} className="btn btn-ghost">
+          오락실로
+        </button>
+      </div>
     </div>
   );
 }

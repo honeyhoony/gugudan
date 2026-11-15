@@ -5,7 +5,17 @@ export type GameMode =
   | "ladder"
   | "mash"
   | "mole"
-  | "kwh";
+  | "kwh"
+  | "micro";
+
+export type MicroId =
+  | "rub"
+  | "sprint"
+  | "ruler"
+  | "mathOdd"
+  | "leftRight"
+  | "rps"
+  | "order";
 
 export type Player = {
   id: string;
@@ -21,6 +31,7 @@ export type LadderPhase = "idle" | "picking" | "running" | "result";
 export type MashPhase = "idle" | "countdown" | "play" | "result";
 export type MolePhase = "idle" | "play" | "result";
 export type KwhPhase = "idle" | "countdown" | "play" | "reveal";
+export type MicroPhase = "idle" | "countdown" | "play" | "result";
 
 export type OxState = {
   phase: OxPhase;
@@ -72,6 +83,17 @@ export type KwhState = {
   stops: Record<string, number>;
 };
 
+export type MicroState = {
+  id: MicroId | null;
+  phase: MicroPhase;
+  endsAt: number | null;
+  startedAt: number | null;
+  scores: Record<string, number>;
+  /** last side for sprint etc. */
+  meta: Record<string, unknown>;
+  challenge: Record<string, unknown>;
+};
+
 export type RoomState = {
   title: string;
   mode: GameMode;
@@ -82,6 +104,7 @@ export type RoomState = {
   mash: MashState;
   mole: MoleState;
   kwh: KwhState;
+  micro: MicroState;
 };
 
 export type PublicRoom = {
